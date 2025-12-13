@@ -23,6 +23,9 @@ export const helperForRefreshTokenOnly = async (refreshToken: string, sessionId:
 
   //if refresh token is invalid
   if (refreshPayload === null) {
+    res.clearCookie("refreshToken");
+    res.clearCookie("sessionId");
+    res.clearCookie("accessToken");
     return res.status(401).json({ message: "Invalid refresh token. Unauthorized" });
   }
 
@@ -31,21 +34,33 @@ export const helperForRefreshTokenOnly = async (refreshToken: string, sessionId:
 
   //if refresh token not found in db
   if (error || !hashedRefreshToken) {
+    res.clearCookie("refreshToken");
+    res.clearCookie("sessionId");
+    res.clearCookie("accessToken");
     return res.status(401).json({ message: "Refresh token not found in database. Unauthorized" });
   }
 
   if(hashedRefreshToken.revoked) {
+    res.clearCookie("refreshToken");
+    res.clearCookie("sessionId");
+    res.clearCookie("accessToken");
     return res.status(401).json({ message: "Refresh token has been revoked. Unauthorized" });
   }
 
   //compare refresh token
   const isRefreshTokenValid = await compare(refreshToken, hashedRefreshToken.refreshToken);
   if (!isRefreshTokenValid) {
+    res.clearCookie("refreshToken");
+    res.clearCookie("sessionId");
+    res.clearCookie("accessToken");
     return res.status(401).json({ message: "Refresh token mismatch. Unauthorized" });
   }
 
   //check userId match
   if(refreshPayload.userId !== hashedRefreshToken.userId) {
+    res.clearCookie("refreshToken");
+    res.clearCookie("sessionId");
+    res.clearCookie("accessToken");
     return res.status(401).json({ message: "Refresh token user mismatch. Unauthorized" });
   }
 

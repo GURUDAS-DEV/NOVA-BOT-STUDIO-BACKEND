@@ -1,9 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { intializeDB } from './Database/Database.js';
+import { intializeDB } from './Database/PostgreSQLDatabase.js';
 import dotenv from 'dotenv';
 import authenticationRouter from './Router/Authentication/router.js';
+import intializeMongoDB from './Database/MongoDBDatabase.js';
 dotenv.config();
 
 const app = express();
@@ -23,7 +24,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 await intializeDB();
-
+await intializeMongoDB();
 
 app.use("/api/auth/", authenticationRouter);
 
