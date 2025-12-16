@@ -20,7 +20,7 @@ const botStructureSchema = new Schema<BotStructureType>({
     },
     platform: {
         type: [String],
-        enum: ['WhatsApp', 'Telegram', 'Facebook', 'Instagram', 'API'],
+        enum: ['WhatsApp', 'Telegram', 'Discord', 'Instagram', 'API'],
         required: true,
     },
     purpose: {
@@ -47,7 +47,7 @@ const botStructureSchema = new Schema<BotStructureType>({
     deleted_at : {
         type : Date,
         default : null
-    }
+    },
 },
 );
 

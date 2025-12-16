@@ -5,6 +5,7 @@ import { intializeDB } from './Database/PostgreSQLDatabase.js';
 import dotenv from 'dotenv';
 import authenticationRouter from './Router/Authentication/router.js';
 import intializeMongoDB from './Database/MongoDBDatabase.js';
+import BotManagementRouter from './Router/Bot_Management/router.js';
 dotenv.config();
 
 const app = express();
@@ -27,6 +28,7 @@ await intializeDB();
 await intializeMongoDB();
 
 app.use("/api/auth/", authenticationRouter);
+app.use("/api/bot/", BotManagementRouter);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

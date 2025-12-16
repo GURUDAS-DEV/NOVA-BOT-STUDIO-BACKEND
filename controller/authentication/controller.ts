@@ -231,7 +231,7 @@ export const handleRegisterController = async (req: Request, res: Response): Pro
             maxAge: 40 * 24 * 60 * 60 * 1000, // 40 days
         });
 
-        return res.status(200).json({ message: "Register Successfully! Your account has been verified.", isLoggedIn: true, username: user.username, email: email });
+        return res.status(200).json({ message: "Register Successfully! Your account has been verified.", isLoggedIn: true, username: user.username, email: email, userId : user.id });
 
     } catch (error: any) {
         console.error("Registration Error:", error);
@@ -379,7 +379,7 @@ export const handleLoginControllerByPassword = async (req: Request, res: Respons
             }
         })();
 
-        return res.status(200).json({ message: "Login successful!", isLoggedIn: true, username: data.username, email: data.email });
+        return res.status(200).json({ message: "Login successful!", isLoggedIn: true, username: data.username, email: data.email ,userId : data.id });
     }
     catch (error: any) {
         console.error("Login Error:", error);
@@ -547,7 +547,7 @@ export const handleLoginController = async (req: Request, res: Response): Promis
             maxAge: 40 * 24 * 60 * 60 * 1000, // 40 days
         });
 
-        return res.status(200).json({ message: "Login successful!", isLoggedIn: true, username: user.username, email: email });
+        return res.status(200).json({ message: "Login successful!", isLoggedIn: true, username: user.username, email: email, userId : user.userId });
     }
     catch (e: any) {
         console.log("Login Error:", e);

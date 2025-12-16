@@ -5,7 +5,7 @@ export interface BotStructureType extends mongoose.Document {
     botName : string;
     botDescription : string | null;
     botAvatar : string | null;
-    platform : Array<'WhatsApp' | 'Telegram' | 'Facebook' | 'Instagram' | 'API'>;
+    platform : Array<'WhatsApp' | 'Telegram' | 'Discord' | 'Instagram' | 'API'>;
     purpose : string;
     intelligenceSource : 'AI' | "DB" | "API" | "Hybrid";
     status : 'active' | 'inactive' | 'paused' | 'draft' | 'deleted';
