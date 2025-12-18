@@ -8,7 +8,7 @@ import { generateAccessToken } from "../../utils/JWT/GenerateTokens.js";
 import { Resend } from "resend";
 import { verifyAccessToken, verifyRefreshToken } from "../../utils/JWT/ValidateToken.js";
 import htmlTemplateForAwaringUser from "../../Email/htmlTemplateForAwaringUser.js";
-import { getLocationFromIP, formatLocation, getBrowserFromUserAgent, getDeviceFromUserAgent } from "../../utils/locationHelper.js";
+import { getLocationFromIP, formatLocation, getBrowserFromUserAgent, getDeviceFromUserAgent } from "../../utils/helper/locationHelper.js";
 import { getLoginOTPEmailHtml } from "../../Email/htmlTemplateForOTPSendingLogin.js";
 
 
@@ -898,3 +898,46 @@ export const handleGitHubAuthentication = async (req: Request, res: Response): P
         return res.status(500).json({ message: "Internal server error", error: e?.message || "Unknown error", });
     }
 };
+
+
+export const logoutController = async (req: Request, res: Response): Promise<Response> => {
+
+    try{
+        const { sessionId, refreshToken } = req.cookies;
+
+        if(!sessionId || !refreshToken){
+            return res.status(400).json({ message: "Session ID and Refresh Token are required to logout." });
+        }
+
+        const { data: sessionData, error: sessionError } = await supabase.from("session").select("refreshToken").eq("sessionId", sessionId).maybeSingle();
+
+        if (sessionError) {
+            return res.status(500).json({ message: "Database error", error: sessionError.message });
+        }
+
+        if (!sessionData) {
+            return res.status(404).json({ message: "Session not found." });
+        }
+
+        const isRefreshTokenValid = await compare(refreshToken, sessionData.refreshToken);
+        if (!isRefreshTokenValid) {
+            return res.status(400).json({ message: "Invalid refresh token." });
+        }
+
+        const { data, error} = await supabase.from("session").update({ revoked: true }).eq("sessionId", sessionId);
+
+        if (error) {
+            return res.status(500).json({ message: "Database error", error: error.message });
+        }
+
+        res.clearCookie("refreshToken", cookieOptions);
+        res.clearCookie("accessToken", cookieOptions);
+        res.clearCookie("sessionId", cookieOptions);
+
+        return res.status(200).json({ message: "User logged out successfully." });
+    }
+    catch (e: any) {
+        return res.status(500).json({ message: "Internal server error", error: e?.message || "Unknown error", });
+    }
+
+}

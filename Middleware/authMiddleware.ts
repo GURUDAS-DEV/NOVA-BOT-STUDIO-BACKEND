@@ -27,9 +27,10 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
                 const { userId, username, email, type } = decoded;
 
                 if (type !== "access") {
+                    res.clearCookie("accessToken", { path: "/" });
                     return res.status(401).json({ message: "Unauthorized: Invalid access token" });
                 }
-
+                
                 (req as any).user = {
                     userId,
                     username,
@@ -39,6 +40,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
                 return next();
             }
             catch (err) {
+                res.clearCookie("accessToken", { path: "/" });
                 return res.status(401).json({ message: "Unauthorized: Invalid access token" });
             }
         }
@@ -46,19 +48,31 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         const { data, error } = await supabase.from("session").select("userId, refreshToken, expiredAt, revoked").eq("sessionId", sessionId).single();
 
         if (error || !data) {
+            res.clearCookie("accessToken", { path: "/" });
+            res.clearCookie("refreshToken", { path: "/" });
+            res.clearCookie("sessionId", { path: "/" });
             return res.status(401).json({ message: "Unauthorized: Invalid session! Refresh Token not in DB" });
         }
-
+        
         if (data.revoked) {
+            res.clearCookie("accessToken", { path: "/" });
+            res.clearCookie("refreshToken", { path: "/" });
+            res.clearCookie("sessionId", { path: "/" });
             return res.status(401).json({ message: "Unauthorized: Session has been revoked" });
         }
-
+        
         if (new Date(data.expiredAt) < new Date()) {
+            res.clearCookie("accessToken", { path: "/" });
+            res.clearCookie("refreshToken", { path: "/" });
+            res.clearCookie("sessionId", { path: "/" });
             return res.status(401).json({ message: "Unauthorized: Session has expired! refreshToken expired" });
         }
-
+        
         const isRefreshTokenValid = await compare(refreshToken, data.refreshToken);
         if (!isRefreshTokenValid) {
+            res.clearCookie("accessToken", { path: "/" });
+            res.clearCookie("refreshToken", { path: "/" });
+            res.clearCookie("sessionId", { path: "/" });
             return res.status(401).json({ message: "Unauthorized: Invalid refresh token! Refresh Token not match" });
         }
 
