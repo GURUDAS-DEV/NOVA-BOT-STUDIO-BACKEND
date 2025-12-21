@@ -11,16 +11,20 @@ import { transistionBotLifecycle } from "../../utils/helper/botLifecycle.js";
 
 export const createBotController = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const { userId, botName, botDescription, botAvatar, platform, purpose, intelligenceSource } = req.body;
+        const { userId, botName, botDescription, botAvatar, platform, style, purpose} = req.body;
 
-        const createdBot = BotStructureModel.create({
+        if(!userId || !botName || !platform || !style || !purpose || !style || !purpose){
+            return res.status(400).json({ message: "Required fields are missing" });
+        }
+
+        const createdBot = await BotStructureModel.create({
             userId,
             botName,
             botDescription,
             botAvatar,
             platform,
+            style,
             purpose,
-            intelligenceSource,
             status: "draft",
         })
         if (!createdBot) {
@@ -28,7 +32,7 @@ export const createBotController = async (req: Request, res: Response): Promise<
         }
 
 
-        return res.status(200).json({ message: "Bot created successfully" });
+        return res.status(200).json({ message: "Bot created successfully", id : createdBot._id });
     }
     catch (error) {
         return res.status(500).json({ message: "Internal Server Error", error });
@@ -49,7 +53,7 @@ export const getBotDetailsForHomePageController = async (req: Request, res: Resp
             return res.status(400).json({ message: "User ID is required" });
         }
 
-        const bots = await BotStructureModel.find({ userId }).sort({ created_at: -1 });
+        const bots = await BotStructureModel.find({ userId }).sort({ created_at: -1 }).where({ status: { $ne: "deleted" } });
         if (!bots) {
             return res.status(404).json({ message: "No bots found for this user" });
         }
@@ -238,6 +242,28 @@ export const permanentlyDeleteBotController = async (req: Request, res: Response
             return res.status(404).json({ message: "Bot not found" });
         }
         return res.status(200).json({ message: "Bot Permanently Deleted Successfully", bot });
+    }
+    catch(e){
+        return res.status(500).json({ message: "Internal Server Error", e });
+    }
+
+}
+
+export const getOneBotDetailsController = async (req: Request, res: Response): Promise<Response> => {
+    try{
+        const userId = (req as any).user?.userId;
+        const { botId } = req.params;
+
+        if(!userId || !botId){
+            return res.status(400).json({ message: "User ID and bot ID bot are required! But not provided" });
+        }
+
+        const bot = await BotStructureModel.findById(botId);
+        if(!bot){
+            return res.status(404).json({ message: "Bot not found" });
+        }
+
+        return res.status(200).json({ message: "Single Bot Details", bot });
     }
     catch(e){
         return res.status(500).json({ message: "Internal Server Error", e });
