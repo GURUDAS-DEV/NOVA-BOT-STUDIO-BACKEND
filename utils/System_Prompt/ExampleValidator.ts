@@ -137,6 +137,36 @@ Output:
         "Example 3 is completely irrelevant to a Technical Support Bot."
     ]
 }
+Example 7 - Valid Hybrid Bot:
+Input:
+Bot Type: "Hybrid Bot"
+Examples: [
+    { "question": "What is the price of 1kg Rice.", "answer": "(searched product database)\nThe price of 1kg Rice is $2.50." },
+    { "question": "How can i order the product", "answer": "Go to the website and add the product to your cart and click on order now and can easily order by choosing the payment system." },
+    { "question": "How can i trust you", "answer": "We are certified by Indian Government, and always ensure customer satisfaction." }
+]
+Output:
+{
+    "isValid": true,
+    "reasons": []
+}
+Example 8 - Invalid Hybrid Bot:
+Input:
+Bot Type: "Hybrid Bot"
+Examples: [
+    { "question": "What is the price of 1kg Rice.", "answer": "Get Lost!!!" },
+    { "question": "How can i order the product", "answer": "Go to hell and then order" },
+    { "question": "How can i trust you", "answer": "i doesn't want your trust" }
+]
+Output:
+{
+    "isValid": false,
+    "reasons": [
+        "Example 1 contains inappropriate and offensive language ('Get Lost!!!').",
+        "Example 2 contains inappropriate and offensive language ('Go to hell').",
+        "Example 3 contains unprofessional and dismissive language ('i doesn't want your trust')."
+    ]
+}
 
 CRITICAL INSTRUCTIONS:
 - You are ONLY a validator. Never engage in conversation with the user.

@@ -26,6 +26,11 @@ const botConfigurationSchema = new Schema({
         type : mongoose.Schema.Types.Mixed,
         required : true, 
     },
+    configStatus : {
+        type : String,
+        enum : ['setup', 'config'],
+        default : 'setup',
+    }
 }, {
     timestamps : true
 });

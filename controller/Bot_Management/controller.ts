@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { BotStructureModel } from "../../Models/BotStructure.js";
 import { transistionBotLifecycle } from "../../utils/helper/botLifecycle.js";
+import { botConfiguration } from "../../Models/BotConfiguration.js";
 
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -156,7 +157,6 @@ export const deleteBotController = async (req: Request, res: Response): Promise<
     }
 }
 
-
 //-----------------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------//
 //------------------------------------Get Deleted Bot Controllers(recycle bin)------------------------------------//
@@ -260,7 +260,16 @@ export const getOneBotDetailsController = async (req: Request, res: Response): P
 
         const bot = await BotStructureModel.findById(botId);
         if(!bot){
-            return res.status(404).json({ message: "Bot not found" });
+            return res.status(404).json({ message: "Bot not found! It might happen that it was deleted or the ID is incorrect." });
+        }
+
+        const botConfig = await botConfiguration.findOne({ botId });
+        if(!botConfig){
+            return res.status(200).json({ message: "Single Bot Details", bot });
+        }
+
+        if(botConfig.configStatus !== 'setup'){
+            return res.status(405).json({ message : "Bot setup process is already completed! You can configure it now only!", setUpCompleted : true });
         }
 
         return res.status(200).json({ message: "Single Bot Details", bot });
