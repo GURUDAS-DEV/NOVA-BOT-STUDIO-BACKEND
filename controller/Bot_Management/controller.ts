@@ -211,13 +211,19 @@ export const restoreDeletedBotController = async (req: Request, res: Response): 
             return res.status(403).json({ message: "Forbidden: You don't have permission to restore this bot" });
         }
 
-        bot.status = transistionBotLifecycle(bot.status as any, "draft");
+        const botConfig = await botConfiguration.findOne({ botId });
+        if(!botConfig)
+            bot.status = transistionBotLifecycle(bot.status as any, "draft");
+        else
+            bot.status = transistionBotLifecycle(bot.status as any, "inactive");
+
         bot.deleted_at = null;
         await bot.save();
 
         return res.status(200).json({ message: "Bot Restored Successfully" });
     }
     catch (e) {
+        console.log(e);
         return res.status(500).json({ message: "Internal Server Error", e });
     }
 }

@@ -1,10 +1,10 @@
 type botState = "draft" | "active" | "paused" | "deleted" | "inactive";
 
 const Transistion : Record<botState, botState[]> = {
-    draft: ["active", "deleted"],
+    draft: ["inactive", "deleted"],
     active: ["paused", "deleted"],
     paused: ["active", "deleted"],
-    deleted: ["draft", "paused"],
+    deleted: ["draft", "inactive"],
     inactive : ["active", "deleted"],
 };
 

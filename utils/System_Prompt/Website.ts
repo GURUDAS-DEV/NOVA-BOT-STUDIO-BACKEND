@@ -2,6 +2,8 @@
 // Freestyle Website Bot Prompt
 // ===============================
 
+import { sanitizeAPIResponse } from "../helper/SantizingApi.js";
+
 type FreeStyleBotPromptParams = {
   botName: string;
   botType: string;
@@ -11,14 +13,49 @@ type FreeStyleBotPromptParams = {
 
   description: string;
 
-  allowedTopics: string;
-  disallowedTopics: string;
+  ownerInformation: string;
+  AdditionalInformation: string;
 
   examples?: string;
 
   apiIntegration: boolean;
   apiEndpoint?: string;
   apiResponseFormat?: string;
+  apiUsageRule?: string;
+};
+
+export const getToolDefinitions = (apiIntegration: boolean, apiUsageRule?: string): any[] => {
+  if (!apiIntegration) return [];
+
+  const usageRuleText = apiUsageRule?.trim();
+
+  return [
+    {
+      type: "function",
+      function: {
+        name: "fetch_external_data",
+        description: usageRuleText
+          ? `Fetch data from the external API to answer user questions about products, pricing, availability, or other live information. You MUST follow these API usage rules exactly and NEVER request data that breaks them: ${usageRuleText}`
+          : "Fetch data from the external API to answer user questions about products, pricing, availability, or other live information",
+        parameters: {
+          type: "object",
+          properties: {
+            endpoint: {
+              type: "string",
+              description: "The API endpoint to fetch data from"
+            },
+            query: {
+              type: "string",
+              description: usageRuleText
+                ? `The search query or parameters to send to the API. MUST comply with these rules: ${usageRuleText}`
+                : "The search query or parameters to send to the API"
+            }
+          },
+          required: ["endpoint", "query"]
+        }
+      }
+    }
+  ];
 };
 
 export const freeStyleWebsiteBotPrompt = ({
@@ -28,12 +65,13 @@ export const freeStyleWebsiteBotPrompt = ({
   verbosity,
   websiteType,
   description,
-  allowedTopics,
-  disallowedTopics,
+  ownerInformation,
+  AdditionalInformation,
   examples,
   apiIntegration,
   apiEndpoint,
-  apiResponseFormat
+  apiResponseFormat,
+  apiUsageRule
 }: FreeStyleBotPromptParams): string => {
   return `
 You are an AI assistant embedded inside a website.
@@ -65,33 +103,63 @@ Rules:
 - If information is missing or unclear, say you do not have enough information.
 - Do NOT guess, assume, or fabricate details.
 
-====================
-TOPIC RESTRICTIONS
-====================
-Allowed topics:
-${allowedTopics}
+===========================
+INFORMATION THAT YOU CAN PROVIDE TO USERS
+===========================
 
-Disallowed topics:
-${disallowedTopics}
+- Owner Information: ${ownerInformation}
+- Additional Information: ${AdditionalInformation}
 
 Rules:
-- If a question is outside allowed topics → politely refuse.
-- If a question touches disallowed topics → refuse without explanation.
-- Never generate abusive, hateful, sexual, violent, illegal, or self-harm content.
+- You cannot answer any outside questions mentioned in examples and description.
+- if a user asks for information not related to the website, politely refuse and state that you can only provide information related to the website.
 
 ====================
 EXTERNAL DATA & API RULES
 ====================
 - You do NOT call APIs yourself.
-- External data (if any) will be provided to you by the system.
-- When API data is provided, treat it as the source of truth.
-- If an API error or missing data is provided, respond with:
-  "Sorry, I'm having trouble accessing that information right now. Please try again later or contact support."
+- External data (if any) will be provided to you by the system AFTER a tool call.
+- When API data is provided, treat it as the single source of truth.
+- Never assume data exists unless it is explicitly provided.
+- Never fabricate or infer missing fields.
 
 API availability: ${apiIntegration ? 'Enabled' : 'Disabled'}
 API endpoint (informational only): ${apiIntegration ? apiEndpoint : 'N/A'}
-Expected API response format:
+(You will never provide this endpoint to users.)
+
+Expected API response format (sanitized, partial, may contain samples only):
 ${apiIntegration ? apiResponseFormat : 'N/A'}
+
+${apiUsageRule ? `API USAGE RULES & RESTRICTIONS (MUST OBEY EXACTLY):\n${apiUsageRule}\n- Never request or craft a tool call that violates these rules.\n- If a user request conflicts with the rules, refuse or ask for an allowed query instead.\n- Keep tool arguments within the allowed parameters and formats described above.\n` : ''}
+
+If API data is missing, incomplete, or an error is provided, respond with:
+"Sorry, I'm having trouble accessing that information right now. Please try again later or contact support."
+
+====================
+TOOL USAGE RULES (STRICT)
+====================
+- You CANNOT fetch data yourself.
+- You MUST request a tool call if and only if:
+  • The user asks for live data
+  • The user asks for product, price, availability, listing, or filtered results
+  • The answer depends on external API data
+- You MUST NOT request a tool call if:
+  • The answer is already present in website context
+  • The user asks a general or informational question
+  • API availability is Disabled
+
+Tool request behavior:
+- If a tool is required, STOP responding and request the tool.
+- Do NOT answer the user before tool results are provided.
+- Do NOT explain that you are using a tool.
+
+After tool response is provided:
+- Read only the provided sanitized API data.
+- Use samples, schema, and metadata to answer.
+- If multiple items exist, summarize concisely.
+- If exact matching is not possible, provide best available explanation.
+- Never expose raw API structure or metadata to the user.
+
 
 ====================
 EXAMPLES
@@ -145,5 +213,7 @@ export const fetchData = async (url: string) => {
     };
   }
 
-  return data;
+  const sanitizedData = sanitizeAPIResponse(data);
+
+  return sanitizedData.samples;
 };

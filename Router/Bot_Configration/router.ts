@@ -1,7 +1,7 @@
-import exress from 'express';
+import express from 'express';
 import { setConfigController, testUserGivenApiController } from '../../controller/BotConfigrationController/controller.js';
 
-const BotConfigrationRouter = exress.Router();
+const BotConfigrationRouter = express.Router();
 
 BotConfigrationRouter.post("/testUserGivenApi", testUserGivenApiController);
 BotConfigrationRouter.post("/setConfig", setConfigController);
