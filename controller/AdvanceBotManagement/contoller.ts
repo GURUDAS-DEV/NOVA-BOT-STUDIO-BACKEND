@@ -32,13 +32,11 @@ export const startBotController = async(req : Request, res : Response) : Promise
         
         const Generated_API_KEY = generateAPIKey();
         const hashedApiKey = hashApiKey(Generated_API_KEY);
-
-        botDetails.status = transistionBotLifecycle(botDetails.status, 'active');
-        await botDetails.save();
+        console.log(botDetails.status);
 
         const { data , error } = await supabase.from("API_KEY").insert({
             botId : botId,
-            hashedApiKey : hashedApiKey,
+            HashedApiKey : hashedApiKey,
             isRevoked : false,
         });
 
@@ -46,10 +44,13 @@ export const startBotController = async(req : Request, res : Response) : Promise
             return res.status(500).json({ message : "Error storing API key.", error : error.message });
         }
 
+        botDetails.status = transistionBotLifecycle(botDetails.status, 'active');
+        await botDetails.save();
+
         return res.status(200).json({ message : "Bot started successfully.", apiKey : Generated_API_KEY });
     }
     catch(e){
+        console.error("Error in startBotController:", e);   
         return res.status(500).json({ message : "Internal Server Error", error : (e as Error).message });
     }
-
 }

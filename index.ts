@@ -10,6 +10,7 @@ import aiFeatureManagementRouter from './Router/AI_Feature_Management/router.js'
 import { BotConfigrationRouter } from './Router/Bot_Configration/router.js';
 import TestingRouter from './Router/Testing/router.js';
 import advanceBotRouter from './Router/Advance_Bot_Management/router.js';
+import APIKeyRouter from './Router/API_Key_Management/router.js';
 dotenv.config();
 
 const app = express();
@@ -36,6 +37,7 @@ app.use("/api/bot/", BotManagementRouter);
 app.use("/api/aiFeatures/", aiFeatureManagementRouter);
 app.use("/api/botConfig/", BotConfigrationRouter);
 app.use("/api/advanceBotController", advanceBotRouter);
+app.use("/api/APIKeyManagement", APIKeyRouter);
 app.use("/testing", TestingRouter);
 
 app.get("/ping", (req, res) => {

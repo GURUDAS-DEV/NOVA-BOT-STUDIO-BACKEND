@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { BotStructureModel } from "../../Models/BotStructure.js";
 import { transistionBotLifecycle } from "../../utils/helper/botLifecycle.js";
 import { botConfiguration } from "../../Models/BotConfiguration.js";
+import { supabase } from "../../Database/postgresql.js";
 
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -146,10 +147,29 @@ export const deleteBotController = async (req: Request, res: Response): Promise<
         if (bot.userId !== userId) {
             return res.status(403).json({ message: "Forbidden: You don't have permission to delete this bot" });
         }
+        
+        const stringBotId = bot._id.toString();
+        console.log("Revoking API Key for botId:", stringBotId);
+        
+        // Update API key - use exact column names as defined in schema with double quotes
+        const {data, error} = await supabase
+            .from("API_KEY")
+            .update({ 
+                isRevoked: true,
+                Revoked_at: new Date().toISOString()
+            })
+            .eq("botId", stringBotId)
+            .select();
 
+        if(error){
+            console.error("Error revoking API key:", error);
+            return res.status(500).json({ message : "Error revoking API key.", error : error.message });
+        }
+        
         bot.status = transistionBotLifecycle(bot.status as any, "deleted");
         bot.deleted_at = new Date();
         await bot.save();
+
         return res.status(200).json({ message: "Bot Deleted Successfully" });
     }
     catch (e) {
