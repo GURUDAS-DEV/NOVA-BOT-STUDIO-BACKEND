@@ -23,6 +23,7 @@
     "@supabase/supabase-js": "^2.86.2",
     "@types/crypto-js": "^4.2.2",
     "@types/jsonwebtoken": "^9.0.10",
+    "@upstash/redis": "^1.36.1",
     "bcrypt-ts": "^8.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

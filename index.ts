@@ -11,6 +11,8 @@ import { BotConfigrationRouter } from './Router/Bot_Configration/router.js';
 import TestingRouter from './Router/Testing/router.js';
 import advanceBotRouter from './Router/Advance_Bot_Management/router.js';
 import APIKeyRouter from './Router/API_Key_Management/router.js';
+import { getRedisClient } from './Redis/connect.js';
+import communcationWithBotRouter from './Router/CommunicationWithBot/Website/router.js';
 dotenv.config();
 
 const app = express();
@@ -32,6 +34,8 @@ app.use(express.urlencoded({ extended: true }));
 await intializeDB();
 await intializeMongoDB();
 
+getRedisClient();
+
 app.use("/api/auth/", authenticationRouter);
 app.use("/api/bot/", BotManagementRouter);
 app.use("/api/aiFeatures/", aiFeatureManagementRouter);
@@ -39,6 +43,10 @@ app.use("/api/botConfig/", BotConfigrationRouter);
 app.use("/api/advanceBotController", advanceBotRouter);
 app.use("/api/APIKeyManagement", APIKeyRouter);
 app.use("/testing", TestingRouter);
+
+//communcation with website bot : 
+app.use("/websiteBot/", communcationWithBotRouter);
+
 
 app.get("/ping", (req, res) => {
     res.status(200).json({ message: "Pong!" });

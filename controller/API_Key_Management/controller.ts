@@ -3,6 +3,7 @@ import { BotStructureModel } from "../../Models/BotStructure.js";
 import { supabase } from "../../Database/postgresql.js";
 import { generateAPIKey } from "../../utils/helper/APIKeyGenerator.js";
 import { hashApiKey } from "../../utils/helper/APIKeyHashing.js";
+import { getRedisClient } from "../../Redis/connect.js";
 
 
 export const APIKeyForWebsiteController = async(req : Request, res : Response) : Promise<Response> => {
@@ -46,7 +47,12 @@ export const GenerateNewApiKeyForWebsiteController = async(req : Request, res : 
         }
 
         console.log(botId);
-        const {data , error} = await supabase.from('API_KEY').update({ isRevoked : true }).eq('botId', botId).eq('isRevoked', false).select("*");
+        const {data , error} = await supabase.from('API_KEY').update({ isRevoked : true }).eq('botId', botId).eq('isRevoked', false).select("HashedApiKey");
+
+        const redis = getRedisClient();
+        if(data && data.length > 0){
+            await redis.del(`apiKey:${data[0].HashedApiKey}`); //delete cached api key if exists
+        }
 
         console.log(data);
         if(error)

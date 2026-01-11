@@ -44,19 +44,20 @@ export const getToolDefinitions = (apiIntegration: boolean, apiUsageRule?: strin
               type: "string",
               description: "The API endpoint to fetch data from"
             },
-            query: {
-              type: "string",
+            queryParams: {
+              type: "object",
               description: usageRuleText
-                ? `The search query or parameters to send to the API. MUST comply with these rules: ${usageRuleText}`
-                : "The search query or parameters to send to the API"
+                ? `An object containing query parameters to send to the API (e.g., {\"q\": \"search term\"}, {\"category\": \"electronics\"}, {\"product\": \"laptop\"}). Choose parameter names based on the API usage rules. MUST comply with these rules: ${usageRuleText}`
+                : "An object containing query parameters to send to the API. Choose appropriate parameter names based on what the user is asking for.",
+              additionalProperties: true
             }
           },
-          required: ["endpoint", "query"]
+          required: ["endpoint", "queryParams"]
         }
       }
     }
   ];
-};
+}
 
 export const freeStyleWebsiteBotPrompt = ({
   botName,
@@ -212,7 +213,6 @@ export const fetchData = async (url: string) => {
       message: data?.message || 'Error while fetching data from external source'
     };
   }
-
   const sanitizedData = sanitizeAPIResponse(data);
 
   return sanitizedData.samples;
