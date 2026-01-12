@@ -3,6 +3,27 @@ import { sanitizeAPIResponse } from "../../utils/helper/SantizingApi.js";
 import { botConfiguration } from "../../Models/BotConfiguration.js";
 import { BotStructureModel } from "../../Models/BotStructure.js";
 
+export const getConfigController = async (req: Request, res: Response): Promise<Response> => {
+    try{
+        const userId = (req as any).user?.userId;
+        const { botId }  = req.params;
+
+        if(!userId || !botId){
+            return res.status(400).json({ message : "User ID and Bot ID are required."});
+        }
+
+        const botConfig = await botConfiguration.findOne({botId : botId.toString()});
+        if(!botConfig){
+            return res.status(404).json({ message : "Bot Configuration not found."});
+        }
+
+        return res.status(200).json({ message : "Bot Configuration fetched successfully.", botConfig });
+    }
+    catch(e){
+        return res.status(500).json({ message : "Internal Server Error!" });
+    }
+}
+
 export const setConfigController = async (req: Request, res: Response): Promise<Response> => {
     try {
         const { botId, userId, botStyle, botType, websiteType, otherWebsiteType, tone, verbosity, behaviorDescription, OwnerInformation, additionalInformation, examples, apiEndpoint, responseFormat, apiUsageRules }  = req.body;

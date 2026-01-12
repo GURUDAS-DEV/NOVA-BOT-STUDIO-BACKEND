@@ -18,13 +18,18 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 9000;
 
-const allowedOrigins = ['http://localhost:3000'];
+const allowedOrigins = ['http://localhost:3000', 'http://localhost:5173',];
 
 // CORS must be first - before any other middleware
-app.use(cors({
+app.use("/api",cors({
     origin: allowedOrigins,
     credentials: true,
 }));
+
+app.use("/v1", cors({
+    origin: "*",
+    credentials : false,
+}))
 
 // Then cookie parser and body parsers
 app.use(cookieParser());
@@ -45,11 +50,7 @@ app.use("/api/APIKeyManagement", APIKeyRouter);
 app.use("/testing", TestingRouter);
 
 //communcation with website bot : 
-app.use("/websiteBot/", communcationWithBotRouter);
-
-const alll = await redis.get("apiKey:*");
-console.log(alll)
-
+app.use("/v1/websiteBot/", communcationWithBotRouter);
 
 app.get("/ping", (req, res) => {
     res.status(200).json({ message: "Pong!" });

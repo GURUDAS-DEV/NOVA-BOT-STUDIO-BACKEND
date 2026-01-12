@@ -8,6 +8,7 @@ import OpenAI from "openai";
 export const freestyleWebsiteBotController = async(req : Request, res : Response) : Promise<Response> =>{
     try{    
         const botId = (req as any).botId;
+        const { clientId } = req.cookies;
         const {userMessage} = req.body;
         if(!botId || !userMessage){
             return res.status(400).json({ message : "Bot ID and userMessage are required."});
@@ -96,12 +97,33 @@ Bot: ${example.answer || ""}`)
             baseURL: "https://api.groq.com/openai/v1",
         });
 
+        //fetching last messages from redis
+        let newClientId = clientId;
+        let lastMessages = [];
+        const redisKey = `WebsiteBotChatHistory:${botId}:${newClientId}`;
+
+        if(!clientId){
+            const generatedId = crypto.randomUUID();
+            newClientId = generatedId;
+            res.cookie('clientId', generatedId, {
+                maxAge : 60*60*1000,
+            });
+        }
+        else{
+            const storedMessages = await redis.lrange(redisKey, 0, -1);
+
+            if(storedMessages && storedMessages.length > 0){
+                lastMessages = storedMessages.map(msg => typeof msg === 'string' ? JSON.parse(msg) : msg);  
+            }
+        }
+
         const apiUsageRules = config.apiUsageRules || "";
         const tools = getToolDefinitions(hasApiIntegration, apiUsageRules);
 
         const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
             { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
+            ...lastMessages,
+            { role: "user", content: userMessage }
         ];
 
         let finalResponse = "";
@@ -201,6 +223,17 @@ Bot: ${example.answer || ""}`)
         if (!finalResponse) {
             return res.status(500).json({ error: "Failed to get final response from LLM" });
         }
+
+        // Update chat history in Redis
+        const lastMessageLenght = lastMessages.length;
+        if(lastMessageLenght > 10){
+            await redis.lpop(redisKey);
+        }
+        await redis.rpush(redisKey, JSON.stringify({ role: "user", content: userMessage }));
+        await redis.rpush(redisKey, JSON.stringify({ role: "assistant", content: finalResponse }));
+        await redis.expire(redisKey, 60 * 60); // 1 hour expiry
+
+        const allMessages = await redis.lrange(redisKey, 0, -1);
 
         return res.status(200).json({ message: finalResponse });
     }
