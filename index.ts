@@ -34,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 await intializeDB();
 await intializeMongoDB();
 
-getRedisClient();
+const redis = getRedisClient();
 
 app.use("/api/auth/", authenticationRouter);
 app.use("/api/bot/", BotManagementRouter);
@@ -46,6 +46,9 @@ app.use("/testing", TestingRouter);
 
 //communcation with website bot : 
 app.use("/websiteBot/", communcationWithBotRouter);
+
+const alll = await redis.get("apiKey:*");
+console.log(alll)
 
 
 app.get("/ping", (req, res) => {
