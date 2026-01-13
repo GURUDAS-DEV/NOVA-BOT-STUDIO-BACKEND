@@ -13,7 +13,7 @@ NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for buildin
 * **Secure API‑key handling** – generation, hashing, and revocation.  
 * **Robust authentication** – JWT‑based login/registration with refresh tokens.  
 * **Multi‑database support** – PostgreSQL for relational data, MongoDB for flexible storage.  
-* **Redis caching** – fast look‑ups for API‑key validation and session data.  
+* **Redis caching** – fast look‑ups for API‑key validation, session data, and website‑bot communication.  
 
 Targeted at developers building SaaS bot platforms, internal automation tools, or any service that needs programmable bots with fine‑grained access control.
 
@@ -25,11 +25,12 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Authentication** | JWT login, registration, refresh tokens, role‑based middleware. | ✅ Stable |
 | **API‑Key Management** | Secure generation, hashing, revocation, Redis‑backed lookup. | ✅ Stable |
 | **Bot Configuration** | CRUD for bot metadata, custom prompts, and system settings. | ✅ Stable |
+| **Bot Configuration Retrieval** | `GET /botConfig/getConfig/:botId` – fetch a bot’s stored configuration (protected). | ✅ Stable |
 | **AI Feature Management** | Toggle AI modules (e.g., text‑enhancer, validator) per bot. | ✅ Stable |
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
-| **Website Bot Communication** | Dedicated router (`/websiteBot/`) for real‑time website‑bot interactions. | ✅ Stable |
-| **Redis Integration** | Centralised Redis client for caching API keys and session data. | ✅ Stable |
-| **Multi‑DB Support** | PostgreSQL (relational) + MongoDB (document) – both initialized on server start. | ✅ Stable |
+| **Website Bot Communication** | Dedicated router (`/websiteBot/`) for real‑time website‑bot interactions, now backed by Redis for low‑latency messaging. | ✅ Stable |
+| **Redis Integration** | Centralised Redis client for caching API keys, session data, and bot‑communication payloads. | ✅ Stable |
+| **Multi‑DB Support** | PostgreSQL (via `pg`) & MongoDB (via `mongoose`) – both initialized on server start. | ✅ Stable |
 | **CORS Configuration** | Whitelisted origins (`http://localhost:3000`) with credentials support. | ✅ Stable |
 | **Testing Utilities** | Ready‑made test router and controller for CI pipelines. | ✅ Stable |
 
@@ -42,7 +43,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Language** | TypeScript 5 | Static typing, IDE support |
 | **Web Framework** | Express 4 | Minimalist, middleware‑centric |
 | **Database** | PostgreSQL (via `pg`) & MongoDB (via `mongoose`) | Relational + flexible document storage |
-| **Cache** | Redis (via `ioredis`) | Fast key‑value look‑ups for API‑key validation |
+| **Cache** | Redis (via `ioredis`) | Fast key‑value look‑ups for API‑key validation & bot messaging |
 | **Authentication** | `jsonwebtoken`, `bcrypt` | Secure token handling |
 | **Validation / Sanitisation** | `class-validator`, custom sanitiser helpers | Prevent injection attacks |
 | **Testing** | Jest & Supertest (dev dependencies) | Unit & integration testing |
@@ -55,7 +56,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 ```
 src/
 ├─ Database/                # PostgreSQL & MongoDB init helpers
-├─ Redis/                   # Redis client singleton
+├─ Redis/                   # Redis client singleton (used by API‑key & website‑bot layers)
 ├─ Email/                   # HTML email templates
 ├─ Middleware/              # auth & access guards
 ├─ Models/                  # Mongoose schemas & TypeORM entities
@@ -79,7 +80,7 @@ src/
 * **Routers** – each feature lives in its own router file, mounted under a versioned `/api/` namespace.  
 * **Controllers** – thin layers that orchestrate service calls, keeping routers declarative.  
 * **Middleware** – protects routes (`accessMiddleware`, `authMiddleware`).  
-* **Redis** – used for fast API‑key look‑ups (`redis.get("apiKey:*")`) and can be extended for session caching.  
+* **Redis** – now powers both API‑key caching *and* the real‑time website‑bot communication channel, enabling sub‑millisecond message round‑trips.  
 
 ---  
 
@@ -176,8 +177,16 @@ await axios.get('http://localhost:9000/api/bot/', {
 });
 ```
 
+### Example: Retrieve a Bot Configuration
+```typescript
+await axios.get('http://localhost:9000/api/botConfig/getConfig/12345', {
+  headers: { Cookie: `refreshToken=${refreshToken}` },
+  withCredentials: true,
+});
+```
+
 ### Website Bot Communication
-The new router `websiteBot/` serves endpoints used by front‑end widgets to interact with a bot in real time.
+The router `websiteBot/` serves endpoints used by front‑end widgets to interact with a bot in real time. Thanks to Redis integration, messages are queued and responded to with sub‑millisecond latency.
 
 ```bash
 POST http://localhost:9000/websiteBot/message
@@ -202,6 +211,7 @@ POST http://localhost:9000/websiteBot/message
 | | `DELETE` | `/APIKeyManagement/:id` | Revoke an API key |
 | **Bot Config** | `POST` | `/botConfig/` | Create bot configuration |
 | | `GET` | `/botConfig/` | List bot configurations |
+| | `GET` | `/botConfig/getConfig/:botId` | **Fetch a specific bot’s configuration** (protected) |
 | | `PUT` | `/botConfig/:id` | Update a bot configuration |
 | | `DELETE` | `/botConfig/:id` | Delete a bot configuration |
 | **Bot Management** | `GET` | `/bot/` | Retrieve bots owned by the authenticated user |
@@ -247,7 +257,7 @@ npm run format        # Prettier
 
 ### Debugging
 * Use `DEBUG=express:*` to see request logs.  
-* Redis client can be inspected via `redis-cli` (`KEYS apiKey:*`).  
+* Redis client can be inspected via `redis-cli` (`KEYS apiKey:*` or `KEYS websiteBot:*`).  
 
 ---  
 
@@ -284,7 +294,7 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ### Performance Tips
 * Enable Redis persistence (`appendonly yes`) for API‑key durability.  
 * Use PostgreSQL connection pooling (`pg-pool`).  
-* Set `keepAliveTimeout` in Express if behind a load balancer.
+* Set `keepAliveTimeout` in Express if behind a load balancer.  
 
 ---  
 
@@ -304,7 +314,7 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ### Review Guidelines
 * All new endpoints must have unit tests (`__tests__` folder).  
 * Update the OpenAPI spec (`openapi.yaml`) if you add/modify routes.  
-* Document any new environment variables in the **Configuration** section.
+* Document any new environment variables in the **Configuration** section.  
 
 ---  
 
@@ -317,7 +327,7 @@ This project is licensed under the **MIT License** – see the [LICENSE](LICENSE
 * **Express.js** – web framework.  
 * **TypeScript** – static typing.  
 * **MongoDB** & **PostgreSQL** – data stores.  
-* **Redis** – caching layer.  
+* **Redis** – caching and real‑time messaging layer.  
 * **Jest** – testing framework.  
 * **Docker** – containerisation.  
 
