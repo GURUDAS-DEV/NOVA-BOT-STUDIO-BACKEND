@@ -1,5 +1,5 @@
 import express from 'express';
-import { getConfigController, setConfigController, testUserGivenApiController } from '../../controller/BotConfigrationController/controller.js';
+import { getConfigController, setConfigController, testUserGivenApiController, updateConfigController } from '../../controller/BotConfigrationController/controller.js';
 import { authMiddleware } from '../../Middleware/authMiddleware.js';
 
 const BotConfigrationRouter = express.Router();
@@ -8,5 +8,6 @@ BotConfigrationRouter.get("/getConfig/:botId", authMiddleware, getConfigControll
 
 BotConfigrationRouter.post("/testUserGivenApi", testUserGivenApiController);
 BotConfigrationRouter.post("/setConfig", setConfigController);
+BotConfigrationRouter.put("/updateConfig", authMiddleware, updateConfigController);;
 
 export {BotConfigrationRouter};   

@@ -75,6 +75,7 @@ export const ValidateTextController = async (req: Request, res: Response): Promi
         if (!message || !message.content)
             return res.status(500).json({ error: "Failed to get content from response" });
 
+        console.log("Validation result:", message.content);
         return res.status(200).json({
             validationResult: message.content,
         });
@@ -96,13 +97,15 @@ export const ValidateExampleController = async (req: Request, res: Response): Pr
             baseURL: "https://api.groq.com/openai/v1"
         });
 
+        const data = `botType: ${botType}\nExamples: ${JSON.stringify(examples)}`;
+
         const response = await openai.chat.completions.create({
-            model: "llama-3.1-8b-instant",
+            model: "openai/gpt-oss-20b",
             messages: [
                 { role: "system", content: exampleValidatorPrompt },
                 {
                     role: "user",
-                    content: `botType: ${botType}\nExamples: ${examples}`,
+                    content: data,
                 },
             ],
 

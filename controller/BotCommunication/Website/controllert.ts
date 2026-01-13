@@ -134,7 +134,7 @@ Bot: ${example.answer || ""}`)
             iterations++;
 
             const requestParams: any = {
-                model: "openai/gpt-oss-safeguard-20b",
+                model: "openai/gpt-oss-120b",
                 messages,
             };
 

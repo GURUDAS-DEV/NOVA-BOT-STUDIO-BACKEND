@@ -107,3 +107,42 @@ export const testUserGivenApiController = async (req: Request, res: Response): P
     }
 
 }
+
+export const updateConfigController = async (req: Request, res: Response): Promise<Response> => {
+    try{
+        const { config, botId } = req.body;
+
+        if(!botId || !config){
+            return res.status(400).json({ message : "Bot ID and Config are required."});
+        }
+
+        if(typeof config !== 'object'){
+            return res.status(400).json({ message : "Config must be an object."});
+        }
+
+        if(!config.botType || !config.websiteType || !config.tone || !config.verbosity || !config.behaviorDescription || !config.examples){
+            return res.status(400).json({ message : "Config is missing required fields."});
+        }
+        const botStatus = await BotStructureModel.findById(botId);
+        if(!botStatus){
+            return res.status(404).json({ message : "Bot not found."});
+        }
+
+        if(botStatus.status === 'deleted' || botStatus.status === 'draft'){
+            return res.status(400).json({ message : `Cannot update config for a bot with status: ${botStatus.status}`});
+        }
+
+        const botConfig = await botConfiguration.findOne({ botId : botId });
+        if(!botConfig){
+            return res.status(404).json({ message : "Bot Configuration not found."});
+        }
+
+        botConfig.config = config;
+        await botConfig.save();
+
+        return res.status(200).json({ message : "Updated Config successfully" });
+    }
+    catch(e){
+        return res.status(500).json({ message : "Internal Server Error!", error : e });
+    }
+}
