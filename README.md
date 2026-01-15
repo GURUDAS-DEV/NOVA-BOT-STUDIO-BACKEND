@@ -1,5 +1,5 @@
 # NOVA‑BOT‑STUDIO‑BACKEND
-![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND)  
+![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND)
 
 **A modular, TypeScript‑based backend for managing AI bots, API keys, and user authentication.**  
 
@@ -54,7 +54,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ## Architecture
 ```
-src/
+/
 ├─ Database/                # PostgreSQL & MongoDB init helpers
 ├─ Redis/                   # Redis client singleton (used by API‑key & website‑bot layers)
 ├─ Email/                   # HTML email templates
@@ -71,16 +71,25 @@ src/
 │   │   └─ Website/
 │   └─ Testing/
 ├─ controller/              # Business logic per feature
+│   ├─ authentication/
+│   ├─ AI_Feature_Management/
+│   ├─ API_Key_Management/
+│   ├─ AdvanceBotManagement/
+│   ├─ BotAnalyticsManagement/
+│   ├─ BotConfigrationController/
+│   ├─ Bot_Management/
+│   └─ Testing/
 ├─ utils/                   # Helpers (JWT, validation, etc.)
+├─ Static/                  # Assets (logo, etc.)
 ├─ index.ts                 # Server bootstrap
-└─ Static/                  # Assets (logo, etc.)
+└─ .env.example             # Template for environment variables
 ```
 
 * **Entry point (`index.ts`)** – sets up CORS, cookie parser, JSON body parsing, initializes DBs, connects Redis, registers routers, and starts the HTTP server.  
 * **Routers** – each feature lives in its own router file, mounted under a versioned `/api/` namespace.  
 * **Controllers** – thin layers that orchestrate service calls, keeping routers declarative.  
 * **Middleware** – protects routes (`accessMiddleware`, `authMiddleware`).  
-* **Redis** – now powers both API‑key caching *and* the real‑time website‑bot communication channel, enabling sub‑millisecond message round‑trips.  
+* **Redis** – powers both API‑key caching *and* the real‑time website‑bot communication channel, enabling sub‑millisecond message round‑trips.  
 
 ---  
 
@@ -218,7 +227,7 @@ POST http://localhost:9000/websiteBot/message
 | | `POST` | `/bot/` | Deploy a new bot instance |
 | | `DELETE` | `/bot/:id` | Remove a bot |
 | **AI Feature Management** | `PATCH` | `/aiFeatures/:botId` | Enable/disable AI modules for a bot |
-| **Advanced Bot Controller** | `POST` | `/advanceBotController/start` | Start a bot with advanced lifecycle options |
+| **Advanced Bot Management** | `POST` | `/advanceBotController/start` | Start a bot with advanced lifecycle options |
 | | `POST` | `/advanceBotController/stop` | Stop a running bot |
 | **Website Bot** | `POST` | `/websiteBot/message` | Send a message to a website‑embedded bot and receive a reply |
 | | `GET` | `/websiteBot/status/:botId` | Get current status of the website bot |
