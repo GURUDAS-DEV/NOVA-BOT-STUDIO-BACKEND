@@ -4,12 +4,54 @@ import { BotStructureModel } from "../../../Models/BotStructure.js";
 import { botConfiguration } from "../../../Models/BotConfiguration.js";
 import { freeStyleWebsiteBotPrompt, getToolDefinitions, fetchData } from "../../../utils/System_Prompt/Website.js";
 import OpenAI from "openai";
+import { BotAnalyticsModel } from "../../../Models/BotAnalytics.js";
+import type mongoose from "mongoose";
+import crypto from "crypto";
+
+export const analyticsInsertionHelper = async(botId : any, apiHashKey : string, model : string, latency : number, tokenIn : number, tokenOut : number, totalToken : number, eventType : string) : Promise<void> => {
+    try{
+
+        const insertingAnalytics = BotAnalyticsModel.insertOne({
+            botId,
+            apiHashKey,
+            timestamp : new Date(),
+            eventType,
+            usage : {
+                model,
+                tokenIn : tokenIn,
+                tokenOut : tokenOut,
+                totalToken : totalToken,
+            },
+            performance : {
+                latency : latency,
+            },
+            context : {
+                plan : "free",
+                region : "us-east-1",
+            }
+        });
+        if(!insertingAnalytics){
+            console.error("Failed to insert bot analytics");
+            return;
+        }
+        console.log("Bot analytics inserted successfully");
+    }
+    catch(e){
+        console.error("Error in analticsInsertionHelper:", e);
+    }
+
+}
 
 export const freestyleWebsiteBotController = async(req : Request, res : Response) : Promise<Response> =>{
     try{    
         const botId = (req as any).botId;
         const { clientId } = req.cookies;
         const {userMessage} = req.body;
+        let apiKey = req.headers['authorization']?.split(' ')[1];
+        if(apiKey){
+            apiKey = crypto.createHash('sha256').update(apiKey).digest('hex');
+        }
+
         if(!botId || !userMessage){
             return res.status(400).json({ message : "Bot ID and userMessage are required."});
         }
@@ -129,12 +171,16 @@ Bot: ${example.answer || ""}`)
         let finalResponse = "";
         let iterations = 0;
         const maxIterations = 5; // Prevent infinite loops
+        let tokenIn : number = 0;
+        let tokenOut : number = 0;
+        let totalToken : number = 0;
+        let latency = new Date().getTime();
 
         while (iterations < maxIterations) {
             iterations++;
 
             const requestParams: any = {
-                model: "openai/gpt-oss-120b",
+                model: "openai/gpt-oss-safeguard-20b",
                 messages,
             };
 
@@ -143,12 +189,15 @@ Bot: ${example.answer || ""}`)
             }
 
             const response = await openai.chat.completions.create(requestParams);
+            tokenIn =  response.usage?.prompt_tokens === undefined ? 0 : tokenIn + response.usage?.prompt_tokens|| 0;
+            tokenOut = response.usage?.completion_tokens === undefined ? 0 : tokenOut + response.usage?.completion_tokens|| 0;
+            totalToken = tokenIn + tokenOut;
 
             if (!response?.choices?.length) {
                 return res.status(500).json({ error: "Failed to get response from OpenAI" });
             }
 
-            const message = response.choices[0].message;
+            const message = response.choices[0] === undefined  ? {content : "Something went Wrong!"} : response.choices[0].message;
 
             if (message.tool_calls && message.tool_calls.length > 0) {
                 messages.push({
@@ -220,6 +269,8 @@ Bot: ${example.answer || ""}`)
             }
         }
 
+        
+
         if (!finalResponse) {
             return res.status(500).json({ error: "Failed to get final response from LLM" });
         }
@@ -232,10 +283,14 @@ Bot: ${example.answer || ""}`)
         await redis.rpush(redisKey, JSON.stringify({ role: "user", content: userMessage }));
         await redis.rpush(redisKey, JSON.stringify({ role: "assistant", content: finalResponse }));
         await redis.expire(redisKey, 60 * 60); // 1 hour expiry
+        latency = new Date().getTime() - latency;
 
-        const allMessages = await redis.lrange(redisKey, 0, -1);
+        // Insert analytics
+        (async()=>{
+            await analyticsInsertionHelper(botId, apiKey || "NOT_FOUND", "openai/gpt-oss-safeguard-20b", latency, tokenIn, tokenOut, totalToken, "request");
+        })()
 
-        return res.status(200).json({ message: finalResponse });
+        return res.status(200).json({ message: finalResponse, tokenIn, tokenOut, totalToken });
     }
     catch(e){
         console.error("Error in freestyleWebsiteBotController:", e);

@@ -13,6 +13,7 @@ import advanceBotRouter from './Router/Advance_Bot_Management/router.js';
 import APIKeyRouter from './Router/API_Key_Management/router.js';
 import { getRedisClient } from './Redis/connect.js';
 import communcationWithBotRouter from './Router/CommunicationWithBot/Website/router.js';
+import { botAnalyticsRouter } from './Router/BotAnalytics/router.js';
 dotenv.config();
 
 const app = express();
@@ -47,7 +48,8 @@ app.use("/api/aiFeatures/", aiFeatureManagementRouter);
 app.use("/api/botConfig/", BotConfigrationRouter);
 app.use("/api/advanceBotController", advanceBotRouter);
 app.use("/api/APIKeyManagement", APIKeyRouter);
-app.use("/testing", TestingRouter);
+app.use("/api/botAnalytics", botAnalyticsRouter)
+// app.use("/testing", TestingRouter);
 
 //communcation with website bot : 
 app.use("/v1/websiteBot/", communcationWithBotRouter);
