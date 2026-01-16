@@ -152,7 +152,8 @@ Bot: ${example.answer || ""}`)
             });
         }
         else{
-            const storedMessages = await redis.lrange(redisKey, 0, -1);
+            // Limit to last 4 messages (2 turns) to reduce token usage
+            const storedMessages = await redis.lrange(redisKey, -4, -1);
 
             if(storedMessages && storedMessages.length > 0){
                 lastMessages = storedMessages.map(msg => typeof msg === 'string' ? JSON.parse(msg) : msg);  
@@ -160,7 +161,7 @@ Bot: ${example.answer || ""}`)
         }
 
         const apiUsageRules = config.apiUsageRules || "";
-        const tools = getToolDefinitions(hasApiIntegration, apiUsageRules);
+        const tools = hasApiIntegration ? getToolDefinitions(hasApiIntegration, apiUsageRules) : [];
 
         const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
             { role: "system", content: systemPrompt },
@@ -277,8 +278,9 @@ Bot: ${example.answer || ""}`)
 
         // Update chat history in Redis
         const lastMessageLenght = lastMessages.length;
-        if(lastMessageLenght > 10){
-            await redis.lpop(redisKey);
+        if(lastMessageLenght >= 4){
+            // Keep only last 4 messages (2 conversation turns)
+            await redis.ltrim(redisKey, -3, -1);
         }
         await redis.rpush(redisKey, JSON.stringify({ role: "user", content: userMessage }));
         await redis.rpush(redisKey, JSON.stringify({ role: "assistant", content: finalResponse }));
@@ -290,7 +292,7 @@ Bot: ${example.answer || ""}`)
             await analyticsInsertionHelper(botId, apiKey || "NOT_FOUND", "openai/gpt-oss-safeguard-20b", latency, tokenIn, tokenOut, totalToken, "request");
         })()
 
-        return res.status(200).json({ message: finalResponse, tokenIn, tokenOut, totalToken });
+        return res.status(200).json({ message: finalResponse });
     }
     catch(e){
         console.error("Error in freestyleWebsiteBotController:", e);

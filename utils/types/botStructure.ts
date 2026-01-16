@@ -6,7 +6,6 @@ export interface BotStructureType extends mongoose.Document {
     botDescription : string | null;
     botAvatar : string | null;
     platform : 'WhatsApp' | 'Telegram' | 'Discord' | 'Instagram' | 'Website';
-    purpose : string;
     style : string;
     status : 'active' | 'inactive' | 'paused' | 'draft' | 'deleted';
     created_at ?: Date;

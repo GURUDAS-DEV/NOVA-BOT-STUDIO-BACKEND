@@ -13,9 +13,9 @@ import { supabase } from "../../Database/postgresql.js";
 
 export const createBotController = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const { userId, botName, botDescription, botAvatar, platform, style, purpose} = req.body;
+        const { userId, botName, botDescription, botAvatar, platform, style} = req.body;
 
-        if(!userId || !botName || !platform || !style || !purpose || !style || !purpose){
+        if(!userId || !botName || !platform || !style){
             return res.status(400).json({ message: "Required fields are missing" });
         }
 
@@ -26,7 +26,6 @@ export const createBotController = async (req: Request, res: Response): Promise<
             botAvatar,
             platform,
             style,
-            purpose,
             status: "draft",
         })
         if (!createdBot) {
