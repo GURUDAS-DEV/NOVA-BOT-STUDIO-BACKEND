@@ -1,5 +1,5 @@
 # NOVA‑BOT‑STUDIO‑BACKEND
-![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND)
+![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue)
 
 **A modular, TypeScript‑based backend for managing AI bots, API keys, and user authentication.**  
 
@@ -49,6 +49,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Testing** | Jest & Supertest (dev dependencies) | Unit & integration testing |
 | **Containerisation** | Docker (optional) | Consistent dev/prod environments |
 | **CI/CD** | GitHub Actions (lint, test, build) | Automated quality gates |
+| **Utilities** | System Prompt utils (`TextEnhancer`, `TextValidator`, `ExampleValidator`, `Website`) | Provide reusable AI‑prompt processing helpers |
 
 ---  
 
@@ -79,7 +80,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 │   ├─ BotConfigrationController/
 │   ├─ Bot_Management/
 │   └─ Testing/
-├─ utils/                   # Helpers (JWT, validation, etc.)
+├─ utils/                   # Helpers (JWT, validation, system‑prompt utils, etc.)
 ├─ Static/                  # Assets (logo, etc.)
 ├─ index.ts                 # Server bootstrap
 └─ .env.example             # Template for environment variables
@@ -102,6 +103,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | PostgreSQL | 13 |
 | MongoDB | 5 |
 | Redis | 6 |
+| Docker (optional) | 20.10+ |
 
 ### Steps
 ```bash
@@ -117,10 +119,20 @@ cp .env.example .env   # then edit .env with your DB credentials, JWT secret, et
 
 # 4️⃣ Initialise databases (run migrations if needed) – see Database/README for details
 
-# 5️⃣ Start the server
+# 5️⃣ Start the server (development)
 npm run dev   # uses ts-node-dev for hot‑reloading
-# or for production
+
+# 6️⃣ Or build & run for production
 npm run build && npm start
+```
+
+#### Docker (recommended)
+```bash
+# Build the image
+docker build -t nova-bot-studio-backend .
+
+# Run the container
+docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ```
 
 ---  
@@ -328,21 +340,4 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ---  
 
 ## License
-This project is licensed under the **MIT License** – see the [LICENSE](LICENSE) file for details.
-
----  
-
-## Acknowledgments
-* **Express.js** – web framework.  
-* **TypeScript** – static typing.  
-* **MongoDB** & **PostgreSQL** – data stores.  
-* **Redis** – caching and real‑time messaging layer.  
-* **Jest** – testing framework.  
-* **Docker** – containerisation.  
-
----  
-
-## Contact
-Maintainer: **GURUDAS‑DEV** – <https://github.com/GURUDAS-DEV>  
-
-For issues, feature requests, or questions, please open an **Issue** on GitHub.
+This project
