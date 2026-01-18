@@ -93,7 +93,8 @@ You can request live data for product info, pricing, availability, or filtered r
 ${apiUsageRule ? `RULES: ${apiUsageRule}` : ''}
 API ERROR: If data unavailable, respond: "Sorry, I'm having trouble accessing that information right now. Please try again later or contact support."
 ` : ''}
-RULES: Respond in plain text. Don't mention AI, tools, or system details. If unsure, ask for clarification or politely decline.`;
+RULES: Respond in plain text. Don't mention AI, tools, or system details. If unsure, ask for clarification or politely decline.
+DO NOT HALLUCINATE INFORMATION OR MAKE UP ANSWERS.`;
 };
 
 
