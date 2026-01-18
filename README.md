@@ -335,31 +335,4 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ---  
 
 ## Contributing
-1. Fork the repository.  
-2. Create a feature branch (`git checkout -b feat/my‑feature`).  
-3. Install dependencies and run tests (`npm test`).  
-4. Make your changes, ensuring lint passes (`npm run lint`).  
-5. Commit with a clear message and push (`git push origin feat/my‑feature`).  
-6. Open a Pull Request – the CI pipeline will run lint, tests, and build checks.  
-
-### Code Style
-* **TypeScript** – strict mode enabled (`tsconfig.json`).  
-* **ESLint** – Airbnb base config with TypeScript extensions.  
-* **Prettier** – 2‑space indentation, single quotes.  
-
-### Review Guidelines
-* All new endpoints must have unit tests (`__tests__` folder).  
-* Update the OpenAPI spec (`openapi.yaml`) if you add/modify routes.  
-* Document any new environment variables in the **Configuration** section.  
-
----  
-
-## License
-This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.  
-
----  
-
-## Credits
-* **Author**: GURUDAS‑DEV  
-* **Contributors**: See the [contributors graph](https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/graphs/contributors).  
-* **Acknowledgments**: Thanks to the open‑source community for the libraries that make this project possible.  
+1
