@@ -49,7 +49,7 @@ app.use("/api/botConfig/", BotConfigrationRouter);
 app.use("/api/advanceBotController", advanceBotRouter);
 app.use("/api/APIKeyManagement", APIKeyRouter);
 app.use("/api/botAnalytics", botAnalyticsRouter)
-// app.use("/testing", TestingRouter);
+app.use("/api/testing", TestingRouter);
 
 //communcation with website bot : 
 app.use("/v1/websiteBot/", communcationWithBotRouter);
