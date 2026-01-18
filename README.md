@@ -1,7 +1,7 @@
 # NOVA‑BOT‑STUDIO‑BACKEND
 ![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue)
 
-**A modular, TypeScript‑based backend for managing AI bots, API keys, and user authentication.**  
+**A modular, TypeScript‑based backend for managing AI bots, API keys, user authentication, and bot analytics.**  
 
 ---  
 
@@ -12,10 +12,11 @@ NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for buildin
 * **AI feature toggling** – enable/disable advanced AI capabilities per bot.  
 * **Secure API‑key handling** – generation, hashing, and revocation.  
 * **Robust authentication** – JWT‑based login/registration with refresh tokens.  
+* **Bot analytics** – collect, store, and query usage metrics per bot.  
 * **Multi‑database support** – PostgreSQL for relational data, MongoDB for flexible storage.  
 * **Redis caching** – fast look‑ups for API‑key validation, session data, and website‑bot communication.  
 
-Targeted at developers building SaaS bot platforms, internal automation tools, or any service that needs programmable bots with fine‑grained access control.
+Targeted at developers building SaaS bot platforms, internal automation tools, or any service that needs programmable bots with fine‑grained access control and insight into bot performance.
 
 ---  
 
@@ -30,6 +31,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
 | **Website Bot Communication** | Dedicated router (`/websiteBot/`) for real‑time website‑bot interactions, now backed by Redis for low‑latency messaging. | ✅ Stable |
 | **Redis Integration** | Centralised Redis client for caching API keys, session data, and bot‑communication payloads. | ✅ Stable |
+| **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats via `/botAnalytics/` endpoints. | ✅ Stable |
 | **Multi‑DB Support** | PostgreSQL (via `pg`) & MongoDB (via `mongoose`) – both initialized on server start. | ✅ Stable |
 | **CORS Configuration** | Whitelisted origins (`http://localhost:3000`) with credentials support. | ✅ Stable |
 | **Testing Utilities** | Ready‑made test router and controller for CI pipelines. | ✅ Stable |
@@ -61,6 +63,8 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 ├─ Email/                   # HTML email templates
 ├─ Middleware/              # auth & access guards
 ├─ Models/                  # Mongoose schemas & TypeORM entities
+│   ├─ BotAnalytics.ts
+│   └─ (other models)
 ├─ Router/                  # Feature‑specific routers
 │   ├─ Authentication/
 │   ├─ API_Key_Management/
@@ -68,6 +72,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 │   ├─ Bot_Configration/
 │   ├─ AI_Feature_Management/
 │   ├─ Advance_Bot_Management/
+│   ├─ BotAnalytics/
 │   ├─ CommunicationWithBot/
 │   │   └─ Website/
 │   └─ Testing/
@@ -206,6 +211,14 @@ await axios.get('http://localhost:9000/api/botConfig/getConfig/12345', {
 });
 ```
 
+### Example: Fetch Bot Analytics
+```typescript
+await axios.get('http://localhost:9000/api/botAnalytics/summary/12345', {
+  headers: { Cookie: `refreshToken=${refreshToken}` },
+  withCredentials: true,
+});
+```
+
 ### Website Bot Communication
 The router `websiteBot/` serves endpoints used by front‑end widgets to interact with a bot in real time. Thanks to Redis integration, messages are queued and responded to with sub‑millisecond latency.
 
@@ -243,6 +256,8 @@ POST http://localhost:9000/websiteBot/message
 | | `POST` | `/advanceBotController/stop` | Stop a running bot |
 | **Website Bot** | `POST` | `/websiteBot/message` | Send a message to a website‑embedded bot and receive a reply |
 | | `GET` | `/websiteBot/status/:botId` | Get current status of the website bot |
+| **Bot Analytics** | `GET` | `/botAnalytics/summary/:botId` | Retrieve aggregated usage stats for a bot |
+| | `GET` | `/botAnalytics/events/:botId` | List raw analytics events (protected) |
 | **Testing** | `GET` | `/testing/ping` | Simple health check for test environment |
 
 **Authentication** – All routes under `/api/` (except `/auth/*`) require a valid `refreshToken` cookie. The middleware validates the JWT and injects `req.user`.
@@ -340,4 +355,11 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ---  
 
 ## License
-This project
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.  
+
+---  
+
+## Credits
+* **Author**: GURUDAS‑DEV  
+* **Contributors**: See the [contributors graph](https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/graphs/contributors).  
+* **Acknowledgments**: Thanks to the open‑source community for the libraries that make this project possible.  
