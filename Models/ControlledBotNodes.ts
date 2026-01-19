@@ -7,20 +7,61 @@ const NodeSchema = new Schema({
     index: true
   },
 
-  type: {
+  /**
+   * What this node DOES
+   */
+  executor: {
     type: String,
-    enum: ["static", "api", "llm", "end"],
+    enum: ["none", "api", "input", "end"],
     required: true
   },
 
+  /**
+   * Message shown BEFORE execution
+   */
   message: {
     type: String,
     required: true
   },
 
   /**
+   * INPUT EXECUTOR CONFIG
+   * Used only when executor === "input"
+   */
+  inputConfig: {
+    key: { type: String },                 // e.g. "orderId"
+    validationRegex: { type: String },     // optional validation
+    retryLimit: { type: Number },           // max retries
+    nextNodeId: { type: Types.ObjectId }    // REQUIRED: deterministic routing
+  },
+
+  /**
+   * API EXECUTOR CONFIG
+   * Used only when executor === "api"
+   */
+  apiConfig: {
+    endpointKey: { type: String },
+    method: {
+      type: String,
+      enum: ["GET", "POST"]
+    },
+    timeoutMs: { type: Number },
+
+    /**
+     * Save API result in session (Redis)
+     */
+    saveResponseAs: { type: String },
+
+    /**
+     * Whether API response goes through LLM
+     * (LLM only formats/sanitizes, NEVER routes)
+     */
+    useLLMSanitizer: { type: Boolean, default: false }
+  },
+
+  /**
    * OUTPUT CONFIG
-   * Controls what user sees AFTER this node runs
+   * What user sees AFTER node execution
    */
   output: {
     mode: {
@@ -38,42 +79,6 @@ const NodeSchema = new Schema({
 
     allowGoBack: { type: Boolean, required: true },
     allowEnd: { type: Boolean, required: true }
-  },
-
-  /**
-   * API EXECUTOR CONFIG
-   * Used ONLY when type === "API"
-   */
-  apiConfig: {
-    endpointKey: { type: String, required: false },
-    method: {
-      type: String,
-      enum: ["get"],
-      required: false
-    },
-    timeoutMs: { type: Number, required: false },
-
-    /**
-     * Where API response is stored in session (Redis)
-     */
-    saveResponseAs: { type: String, required: false },
-
-    /**
-     * Whether API response should be sent to LLM
-     */
-    useLLMSanitizer: { type: Boolean, required: false }
-  },
-
-  /**
-   * LLM CONFIG
-   * Used when:
-   * - type === "LLM"
-   * - OR apiConfig.useLLMSanitizer === true
-   */
-  llmConfig: {
-    systemPrompt: { type: String, required: false },
-    temperature: { type: Number, required: false },
-    maxTokens: { type: Number, required: false }
   },
 
   createdAt: { type: Date, default: Date.now },

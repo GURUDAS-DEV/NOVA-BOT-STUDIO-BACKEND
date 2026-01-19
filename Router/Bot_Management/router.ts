@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createBotController, deleteBotController, getAllBotsForManagePageController, getBotDetailsForHomePageController, getDeletedBotsController, getOneBotDetailsController, permanentlyDeleteBotController, restoreDeletedBotController } from "../../controller/Bot_Management/controller.js";
+import { createBotController, createWebsiteControlledBotController, deleteBotController, getAllBotsForManagePageController, getBotDetailsForHomePageController, getDeletedBotsController, getOneBotDetailsController, permanentlyDeleteBotController, restoreDeletedBotController } from "../../controller/Bot_Management/controller.js";
 import { authMiddleware } from "../../Middleware/authMiddleware.js";
 
 const BotManagementRouter = Router();
@@ -18,5 +18,7 @@ BotManagementRouter.delete("/deleteBot", authMiddleware, deleteBotController);
 BotManagementRouter.get("/getDeletedBots", authMiddleware, getDeletedBotsController);
 BotManagementRouter.post("/recoverBot", authMiddleware, restoreDeletedBotController);
 BotManagementRouter.delete("/permanentlyDeleteBot", authMiddleware, permanentlyDeleteBotController);
+
+BotManagementRouter.post("/createControlledBot", authMiddleware, createWebsiteControlledBotController);
 
 export default BotManagementRouter;

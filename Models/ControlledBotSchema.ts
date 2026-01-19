@@ -6,7 +6,7 @@ const BotSchema = new Schema({
 
   type: {
     type: String,
-    enum: ["FREESTYLE", "CONTROLLED"],
+    enum: ["CONTROLLED"],
     required: true
   },
 
@@ -17,7 +17,7 @@ const BotSchema = new Schema({
 
   status: {
     type: String,
-    enum: ["draft", "active", "paused", "deleted", 'inactive'],
+    enum: ["draft", "active", "paused", "inactive", "deleted"],
     default: "draft"
   },
 
@@ -25,4 +25,4 @@ const BotSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-export const ControlledBotModel = model("ControlledBotStructure", BotSchema);
+export const ControlledBotModel = model("ControlledBot", BotSchema);

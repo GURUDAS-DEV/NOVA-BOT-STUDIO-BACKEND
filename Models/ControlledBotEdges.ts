@@ -18,8 +18,8 @@ const EdgeSchema = new Schema({
   },
 
   /**
-   * Intent emitted by user option
-   * NOT dynamic data
+   * What user clicks (label / intent)
+   * STATIC only — never dynamic
    */
   intent: {
     type: String,
