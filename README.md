@@ -51,7 +51,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Testing** | Jest & Supertest (dev dependencies) | Unit & integration testing |
 | **Containerisation** | Docker (optional) | Consistent dev/prod environments |
 | **CI/CD** | GitHub Actions (lint, test, build) | Automated quality gates |
-| **Utilities** | System Prompt utils (`TextEnhancer`, `TextValidator`, `ExampleValidator`, `Website`) | Provide reusable AI‑prompt processing helpers |
+| **Utilities** | System Prompt utils (`TextEnhancer`, `TextValidator`, `ExampleValidator`, `Website`) | Reusable AI‑prompt processing helpers |
 
 ---  
 
@@ -291,9 +291,10 @@ npm run lint          # ESLint
 npm run format        # Prettier
 ```
 
-### Debugging
-* Use `DEBUG=express:*` to see request logs.  
-* Redis client can be inspected via `redis-cli` (`KEYS apiKey:*` or `KEYS websiteBot:*`).  
+### Debugging Tips
+* Enable request logging: `DEBUG=express:* npm run dev`.  
+* Inspect Redis keys with `redis-cli` (e.g., `KEYS apiKey:*` or `KEYS websiteBot:*`).  
+* Use VS Code’s “Attach to Node Process” for step‑through debugging of TypeScript sources.
 
 ---  
 
@@ -323,16 +324,42 @@ docker build -t nova-bot-studio-backend .
 docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ```
 
-### Cloud (e.g., Railway, Render, Fly.io)
-* Ensure environment variables are set in the platform UI.  
-* Use the Docker image above or let the platform run `npm start` after installing dependencies.
+### Cloud Platforms (Railway, Render, Fly.io, etc.)
+1. Push the repository to the platform.  
+2. Set the same environment variables defined in `.env.example`.  
+3. Choose the Docker build option or let the platform run `npm install && npm start`.  
 
-### Performance Tips
-* Enable Redis persistence (`appendonly yes`) for API‑key durability.  
-* Use PostgreSQL connection pooling (`pg-pool`).  
-* Set `keepAliveTimeout` in Express if behind a load balancer.  
+### Production Tips
+* Enable Redis AOF (`appendonly yes`) for durability of cached API keys.  
+* Use PostgreSQL connection pooling (`pg-pool`) and tune `max`/`idleTimeoutMillis`.  
+* Set `keepAliveTimeout` in Express when behind a load balancer (`server.keepAliveTimeout = 61000`).  
 
 ---  
 
 ## Contributing
-1
+We welcome contributions! Please follow these steps:
+
+1. **Fork the repository** and create your feature branch (`git checkout -b feature/awesome-feature`).  
+2. **Write code** adhering to the existing style (ESLint + Prettier).  
+3. **Add tests** for new functionality.  
+4. **Run the full test suite** (`npm test`) and ensure coverage stays above the project threshold.  
+5. **Commit** with a clear message and push to your fork.  
+6. **Open a Pull Request** targeting `main`.  
+7. PRs will be automatically linted, tested, and built via GitHub Actions.  
+
+### Code Review Guidelines
+* Keep changes focused – one feature or bug fix per PR.  
+* Update documentation (README, inline JSDoc) when public APIs change.  
+* Ensure any new environment variables are added to `.env.example`.  
+
+---  
+
+## License & Credits
+**License:** MIT © 2024 GURUDAS‑DEV. See the [LICENSE](LICENSE) file for details.
+
+### Contributors
+- **Gurudas Dev** – Project lead & core maintainer  
+- *(Add your name here when you contribute!)*
+
+### Acknowledgments
+*
