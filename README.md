@@ -1,11 +1,11 @@
-# NOVA‑BOT‑STUDIO‑BACKEND
+# NOVA‑BOT‑STUDIO‑BACKEND  
 ![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue)
 
 **A modular, TypeScript‑based backend for managing AI bots, API keys, user authentication, and bot analytics.**  
 
 ---  
 
-## Overview
+## Overview  
 NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for building and operating bot‑centric applications. It supports:
 
 * **Bot lifecycle management** – create, update, delete, and run bots.  
@@ -20,7 +20,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ---  
 
-## Features
+## Features  
 | Feature | Description | Status |
 |---------|-------------|--------|
 | **Authentication** | JWT login, registration, refresh tokens, role‑based middleware. | ✅ Stable |
@@ -38,7 +38,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ---  
 
-## Tech Stack
+## Tech Stack  
 | Layer | Technology | Reason |
 |-------|------------|--------|
 | **Runtime** | Node.js 18 LTS | Modern async APIs, wide ecosystem |
@@ -55,7 +55,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ---  
 
-## Architecture
+## Architecture  
 ```
 /
 ├─ Database/                # PostgreSQL & MongoDB init helpers
@@ -99,18 +99,20 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ---  
 
-## Installation
-### Prerequisites
+## Installation  
+
+### Prerequisites  
 | Tool | Minimum Version |
 |------|-----------------|
 | Node | 18.x |
-| npm | 9.x (or Yarn 1.22+) |
+| npm | 9.x (or Yarn 1.22+) |
 | PostgreSQL | 13 |
 | MongoDB | 5 |
 | Redis | 6 |
 | Docker (optional) | 20.10+ |
 
-### Steps
+### Steps  
+
 ```bash
 # 1️⃣ Clone the repo
 git clone https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND.git
@@ -131,7 +133,8 @@ npm run dev   # uses ts-node-dev for hot‑reloading
 npm run build && npm start
 ```
 
-#### Docker (recommended)
+#### Docker (recommended)  
+
 ```bash
 # Build the image
 docker build -t nova-bot-studio-backend .
@@ -142,7 +145,8 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 
 ---  
 
-## Configuration
+## Configuration  
+
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `PORT` | Port the Express server listens on | `9000` |
@@ -153,7 +157,8 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 | `JWT_REFRESH_SECRET` | Secret for refresh tokens | `supersecretrefresh` |
 | `CORS_ORIGINS` | Comma‑separated list of allowed origins | `http://localhost:3000` |
 
-*Example `.env` snippet*:
+*Example `.env` snippet*  
+
 ```dotenv
 PORT=9000
 POSTGRES_URI=postgresql://postgres:password@localhost:5432/nova
@@ -166,20 +171,25 @@ CORS_ORIGINS=http://localhost:3000
 
 ---  
 
-## Usage
-### Running locally
+## Usage  
+
+### Running locally  
+
 ```bash
 npm run dev
 ```
+
 The API will be reachable at `http://localhost:9000`.
 
-### Health check
+### Health check  
+
 ```bash
 curl http://localhost:9000/ping
 # => {"message":"Pong!"}
 ```
 
-### Example: Register & Login
+### Example: Register & Login  
+
 ```typescript
 import axios from 'axios';
 
@@ -195,7 +205,8 @@ const loginRes = await axios.post('http://localhost:9000/api/auth/login', {
 const { accessToken, refreshToken } = loginRes.data;
 ```
 
-### Example: Call a protected endpoint
+### Example: Call a protected endpoint  
+
 ```typescript
 await axios.get('http://localhost:9000/api/bot/', {
   headers: { Cookie: `refreshToken=${refreshToken}` },
@@ -203,7 +214,8 @@ await axios.get('http://localhost:9000/api/bot/', {
 });
 ```
 
-### Example: Retrieve a Bot Configuration
+### Example: Retrieve a Bot Configuration  
+
 ```typescript
 await axios.get('http://localhost:9000/api/botConfig/getConfig/12345', {
   headers: { Cookie: `refreshToken=${refreshToken}` },
@@ -211,7 +223,8 @@ await axios.get('http://localhost:9000/api/botConfig/getConfig/12345', {
 });
 ```
 
-### Example: Fetch Bot Analytics
+### Example: Fetch Bot Analytics  
+
 ```typescript
 await axios.get('http://localhost:9000/api/botAnalytics/summary/12345', {
   headers: { Cookie: `refreshToken=${refreshToken}` },
@@ -219,7 +232,8 @@ await axios.get('http://localhost:9000/api/botAnalytics/summary/12345', {
 });
 ```
 
-### Website Bot Communication
+### Website Bot Communication  
+
 The router `websiteBot/` serves endpoints used by front‑end widgets to interact with a bot in real time. Thanks to Redis integration, messages are queued and responded to with sub‑millisecond latency.
 
 ```bash
@@ -232,7 +246,8 @@ POST http://localhost:9000/websiteBot/message
 
 ---  
 
-## API Documentation
+## API Documentation  
+
 > Base URL: `http://<host>:<port>/api/`
 
 | Category | Method | Endpoint | Description |
@@ -263,6 +278,7 @@ POST http://localhost:9000/websiteBot/message
 **Authentication** – All routes under `/api/` (except `/auth/*`) require a valid `refreshToken` cookie. The middleware validates the JWT and injects `req.user`.
 
 **Error format**
+
 ```json
 {
   "error": "InvalidCredentials",
@@ -273,33 +289,40 @@ POST http://localhost:9000/websiteBot/message
 
 ---  
 
-## Development
-### Setup
+## Development  
+
+### Setup  
+
 ```bash
 # Install dev dependencies (already done via npm ci)
 npm run dev   # starts ts-node-dev with hot reload
 ```
 
-### Running tests
+### Running tests  
+
 ```bash
 npm test
 ```
 
-### Linting & Formatting
+### Linting & Formatting  
+
 ```bash
 npm run lint          # ESLint
 npm run format        # Prettier
 ```
 
-### Debugging Tips
+### Debugging Tips  
+
 * Enable request logging: `DEBUG=express:* npm run dev`.  
 * Inspect Redis keys with `redis-cli` (e.g., `KEYS apiKey:*` or `KEYS websiteBot:*`).  
 * Use VS Code’s “Attach to Node Process” for step‑through debugging of TypeScript sources.
 
 ---  
 
-## Deployment
-### Docker (recommended)
+## Deployment  
+
+### Docker (recommended)  
+
 ```dockerfile
 # Dockerfile
 FROM node:18-alpine AS builder
@@ -319,24 +342,28 @@ CMD ["node", "dist/index.js"]
 ```
 
 Build & run:
+
 ```bash
 docker build -t nova-bot-studio-backend .
 docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ```
 
-### Cloud Platforms (Railway, Render, Fly.io, etc.)
+### Cloud Platforms (Railway, Render, Fly.io, etc.)  
+
 1. Push the repository to the platform.  
 2. Set the same environment variables defined in `.env.example`.  
 3. Choose the Docker build option or let the platform run `npm install && npm start`.  
 
-### Production Tips
+### Production Tips  
+
 * Enable Redis AOF (`appendonly yes`) for durability of cached API keys.  
 * Use PostgreSQL connection pooling (`pg-pool`) and tune `max`/`idleTimeoutMillis`.  
 * Set `keepAliveTimeout` in Express when behind a load balancer (`server.keepAliveTimeout = 61000`).  
 
 ---  
 
-## Contributing
+## Contributing  
+
 We welcome contributions! Please follow these steps:
 
 1. **Fork the repository** and create your feature branch (`git checkout -b feature/awesome-feature`).  
@@ -347,19 +374,6 @@ We welcome contributions! Please follow these steps:
 6. **Open a Pull Request** targeting `main`.  
 7. PRs will be automatically linted, tested, and built via GitHub Actions.  
 
-### Code Review Guidelines
-* Keep changes focused – one feature or bug fix per PR.  
-* Update documentation (README, inline JSDoc) when public APIs change.  
-* Ensure any new environment variables are added to `.env.example`.  
+### Code Review Guidelines  
 
----  
-
-## License & Credits
-**License:** MIT © 2024 GURUDAS‑DEV. See the [LICENSE](LICENSE) file for details.
-
-### Contributors
-- **Gurudas Dev** – Project lead & core maintainer  
-- *(Add your name here when you contribute!)*
-
-### Acknowledgments
 *
