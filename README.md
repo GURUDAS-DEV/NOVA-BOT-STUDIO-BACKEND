@@ -376,4 +376,6 @@ We welcome contributions! Please follow these steps:
 
 ### Code Review Guidelines  
 
-*
+* Keep changes focused – one feature or bug‑fix per PR.  
+* Update documentation (README, inline JSDoc, Swagger if applicable).  
+* Ensure new endpoints have proper validation and error handling
