@@ -8,6 +8,8 @@ import { BotAnalyticsModel } from "../../../Models/BotAnalytics.js";
 import type mongoose from "mongoose";
 import crypto from "crypto";
 import { ControlledBotModel } from "../../../Models/ControlledBotSchema.js";
+import { ControlledBotNodeModel } from "../../../Models/ControlledBotNodes.js";
+import { ControlledBotEdgeModel } from "../../../Models/ControlledBotEdges.js";
 
 export const analyticsInsertionHelper = async(botId : any, apiHashKey : string, model : string, latency : number, tokenIn : number, tokenOut : number, totalToken : number, eventType : string) : Promise<void> => {
     try{
@@ -325,12 +327,13 @@ export const controlledStyleWebsiteBotController = async(req : Request, res : Re
         const redis = getRedisClient();
         const redisKeyForBot = `controlledWebsiteBotFirstNode:${botId}`;
         const sessionalRedisKey = `controlledWebsiteBotSessionDetail:${botId}:${sessionId}`;
-
+        
+        //Finding bot details from redis, if not found then from db and storing it in redis for next time use.
         let botDetails = await redis.get(redisKeyForBot);
         if(!botDetails){
             const botDBDetails = await ControlledBotModel.findById(botId);
             if(!botDBDetails){
-                return res.status(404).json({ message : "Bot not found."});
+                return res.status(404).json({ message : "Bot not found or deleted by owner."});//0.01% chance of hiting this thing.
             }
             botDetails = {
                 name : botDBDetails.name,
@@ -339,15 +342,27 @@ export const controlledStyleWebsiteBotController = async(req : Request, res : Re
                 entryNodeId : botDBDetails.entryNodeId,
             };
 
-            if(!botDetails ||  (botDetails as any).status !== 'active'){
+            if(!botDetails ||  botDBDetails.status !== 'active'){
                 return res.status(403).json({ message : "Bot is not active."});
             };
 
             await redis.set(redisKeyForBot, JSON.stringify(botDetails), { ex: 3600 });//set for 1 hr. 
         }
+        else{
+            botDetails = typeof botDetails === 'string' ? JSON.parse(botDetails) : botDetails;
+        }
 
+        //finding the ongoing session to retrive where user left (from redis), if not found(means user is requesting for first time or redis has lost the data),then creating new session. 
         const sessionalBotDetails = await redis.get(sessionalRedisKey);
+        if(!sessionalBotDetails){
+            const initialNodeDetails = await ControlledBotNodeModel.findOne({ botId : botId, _id : (botDetails as any).entryNodeId})
+            if(!initialNodeDetails){
+                return res.status(500).json({ message : "Bot configuration error. Please contact bot owner."});
+            }
 
+            const optionsForIntialNode = await ControlledBotEdgeModel.find({ fromNodeId : initialNodeDetails._id});
+            console.log("Initial Node Options:", optionsForIntialNode);
+        }
 
 
         return res.status(200).json({ message: "Controlled Style Website Bot Controller - To be implemented." });

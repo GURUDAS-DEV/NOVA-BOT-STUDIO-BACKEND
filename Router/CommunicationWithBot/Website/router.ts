@@ -6,6 +6,6 @@ import { controlledStyleWebsiteBotController, freestyleWebsiteBotController } fr
 const communcationWithBotRouter = Router();
 
 communcationWithBotRouter.post("/FreeStyleChat", accessMiddleware, freestyleWebsiteBotController);
-communcationWithBotRouter.post("/ControlledStyleChat", accessMiddleware, controlledStyleWebsiteBotController)
+communcationWithBotRouter.post("/ControlledStyleChat",  controlledStyleWebsiteBotController)
 
 export default communcationWithBotRouter;
