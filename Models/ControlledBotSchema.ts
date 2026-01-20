@@ -2,12 +2,18 @@ import { Schema, model, Types } from "mongoose";
 
 const BotSchema = new Schema({
   name: { type: String, required: true },
-  ownerId: { type: String, required: true },
+  userId: { type: String, required: true },
 
   type: {
     type: String,
     enum: ["CONTROLLED"],
     required: true
+  },
+  platform : {
+    type: String,
+    enum: ['WhatsApp', 'Telegram', 'Discord', 'Instagram', 'Website'],
+    required: true,
+    default : 'Website'
   },
 
   entryNodeId: {

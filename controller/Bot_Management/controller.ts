@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import { ControlledBotModel } from "../../Models/ControlledBotSchema.js";
 import { ControlledBotNodeModel } from "../../Models/ControlledBotNodes.js";
 import { ControlledBotEdgeModel } from "../../Models/ControlledBotEdges.js";
+import { platform } from "os";
 
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -53,77 +54,183 @@ export const createBotController = async (req: Request, res: Response): Promise<
 
 export const getBotDetailsForHomePageController = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const userId = (req as any).user?.userId;
-        if (!userId) {
-            return res.status(400).json({ message: "User ID is required" });
-        }
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
 
-        const bots = await BotStructureModel.find({ userId }).sort({ created_at: -1 }).where({ status: { $ne: "deleted" } });
-        if (!bots) {
-            return res.status(404).json({ message: "No bots found for this user" });
-        }
+    // Unified recent bots (latest 4 across controlled + freestyle)
+    const freestyleColl = BotStructureModel.collection.name;
+    const pipeline: any[] = [
+      { $match: { userId, status: { $ne: "deleted" } } },
+      {
+        $project: {
+          _id: 1,
+          name: "$name",
+          platform: "$platform",
+          status: 1,
+          style: { $literal: "CONTROLLED" },
+          created_at: "$createdAt",
+          updated_at: "$updatedAt",
+          entryNodeId: "$entryNodeId",
+        },
+      },
+      {
+        $unionWith: {
+          coll: freestyleColl,
+          pipeline: [
+            { $match: { userId: userId, status: { $ne: "deleted" } } },
+            {
+              $project: {
+                _id: 1,
+                name: "$botName",
+                platform: "$platform",
+                status: 1,
+                style: { $literal: "FREESTYLE" },
+                created_at: "$created_at",
+                updated_at: "$updated_at",
+                entryNodeId: { $literal: null },
+              },
+            },
+          ],
+        },
+      },
+      { $sort: { created_at: -1 } },
+      { $limit: 4 },
+    ];
 
-        let noOfBots = bots.length;
-        let noOfActiveBots = bots.filter((bot) => bot.status === "active").length;
-        const recentBots = bots.slice(0, 4);
+    const recentBots = await ControlledBotModel.aggregate(pipeline);
 
-        return res.status(200).json({ message: "BOT LISTS FOR HOMEPAGE", noOfActiveBots, noOfBots, recentBots });
+    // Totals and active counts
+    const [
+      totalControlled,
+      totalFreestyle,
+      activeControlled,
+      activeFreestyle,
+    ] = await Promise.all([
+      ControlledBotModel.countDocuments({ userId, status: { $ne: "deleted" } }),
+      BotStructureModel.countDocuments({ userId: userId }).where({ status: { $ne: "deleted" } }),
+      ControlledBotModel.countDocuments({ userId, status: "active" }),
+      BotStructureModel.countDocuments({ userId: userId, status: "active" }),
+    ]);
+
+    const noOfBots = totalControlled + totalFreestyle;
+    const noOfActiveBots = activeControlled + activeFreestyle;
+
+    return res.status(200).json({
+      message: "BOT LISTS FOR HOMEPAGE",
+      noOfActiveBots,
+      noOfBots,
+      recentBots,
+    });
     }
     catch (e) {
         return res.status(500).json({ message: "Internal Server Error", e });
     }
 
 }
+//---------------------------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------------------------------------------------------//
+//------------------------------------Get Unified Bots for Manage Page------------------------------------------//
+//---------------------------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------------------------------------------------------//
 
-//-----------------------------------------------------------------------------------------------------------------//
-//-----------------------------------------------------------------------------------------------------------------//
-//-------------------------------------------Get All Bots for Manage Page------------------------------------------//
-//-----------------------------------------------------------------------------------------------------------------//
-//-----------------------------------------------------------------------------------------------------------------//
+export const getUnifiedBotsForManagePageController = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const userId = (req as any).user?.userId;
+    let { cursor } = req.query as { cursor?: string };
 
-export const getAllBotsForManagePageController = async (req: Request, res: Response): Promise<Response> => {
-    try {
-        const userId = (req as any).user?.userId;
-        let { cursor } = req.query as { cursor: string };
-
-        if (!userId) {
-            return res.status(400).json({ message: "User ID is required" });
-        }
-
-        if (cursor === "null" || cursor === "undefined") {
-            cursor = new Date().toISOString();
-        }
-
-        const limit = 10;
-        const query: any = { userId };
-
-        if (cursor) {
-            query.created_at = { $lt: new Date(cursor as string) };
-        }
-
-        const bots = await BotStructureModel.find(query)
-            .where({ status: { $ne: "deleted" } })
-            .sort({ created_at: -1 })
-            .limit(limit + 1);
-
-        if (!bots || bots.length === 0) {
-            return res.status(404).json({ message: "No bots found for this user" });
-        }
-
-        const hasMore = bots.length > limit;
-        if (hasMore)
-            bots.pop();
-
-        const nextCursor = bots.length > 0 ? bots[bots.length - 1]?.created_at : null;
-        const totalBots = await BotStructureModel.countDocuments({ userId }).where({ status: { $ne: "deleted" } });
-
-        return res.status(200).json({ message: "Bots Details!!!", cursor: nextCursor, bots, hasMore, totalBots });
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
     }
-    catch (e) {
-        console.log(e);
-        return res.status(500).json({ message: "Internal Server Error", e });
+
+    if (cursor === "null" || cursor === "undefined") {
+      cursor = new Date().toISOString();
     }
-}
+
+    const limit = 10;
+
+    // Collection names for union
+    const controlledColl = ControlledBotModel.collection.name;
+    const freestyleColl = BotStructureModel.collection.name;
+
+    const pipeline: any[] = [
+      // Controlled bots for this owner (exclude deleted)
+      { $match: { userId, status: { $ne: "deleted" } } },
+      {
+        $project: {
+          _id: 1,
+          platform : "$platform",
+          name: "$name",
+          status: 1,
+          style: { $literal: "CONTROLLED" },
+          created_at: "$createdAt",
+          updated_at: "$updatedAt",
+          entryNodeId: "$entryNodeId",
+        },
+      },
+      {
+        $unionWith: {
+          coll: freestyleColl,
+          pipeline: [
+            { $match: { userId: userId, status: { $ne: "deleted" } } },
+            {
+              $project: {
+                _id: 1,
+                name: "$botName",
+                platform : "$platform",
+                status: 1,
+                style: { $literal: "FREESTYLE" },
+                created_at: "$created_at",
+                updated_at: "$updated_at",
+                entryNodeId: { $literal: null },
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    // Cursor filter on unified created_at
+    if (cursor) {
+      pipeline.push({ $match: { created_at: { $lt: new Date(cursor as string) } } });
+    }
+
+    // Sort and pagination
+    pipeline.push({ $sort: { created_at: -1 } });
+    pipeline.push({ $limit: limit + 1 });
+
+    const items = await ControlledBotModel.aggregate(pipeline);
+
+    if (!items || items.length === 0) {
+      return res.status(404).json({ message: "No bots found for this user" });
+    }
+
+    const hasMore = items.length > limit;
+    if (hasMore) items.pop();
+
+    const nextCursor = items.length > 0 ? items[items.length - 1]?.created_at : null;
+
+    // Totals for pagination
+    const [totalControlled, totalFreestyle] = await Promise.all([
+      ControlledBotModel.countDocuments({ userId, status: { $ne: "deleted" } }),
+      BotStructureModel.countDocuments({ userId: userId }).where({ status: { $ne: "deleted" } }),
+    ]);
+    const total = totalControlled + totalFreestyle;
+
+    return res.status(200).json({
+      message: "Unified bots fetched successfully",
+      cursor: nextCursor,
+      items,
+      hasMore,
+      totals: { total, totalControlled, totalFreestyle },
+    });
+  }
+  catch (e) {
+    console.log(e);
+    return res.status(500).json({ message: "Internal Server Error", e });
+  }
+};
 
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -326,8 +433,8 @@ export const createWebsiteControlledBotController = async (
 
   try {
     // Extract authenticated user ID
-    const ownerId = (req as any).user?.userId;
-    if (!ownerId) {
+    const userId = (req as any).user?.userId;
+    if (!userId) {
       await session.abortTransaction();
       return res.status(401).json({ message: "Unauthorized: User ID is required" });
     }
@@ -369,7 +476,7 @@ export const createWebsiteControlledBotController = async (
     // Step 3: Create ControlledBot document
     const controlledBot = new ControlledBotModel({
       name: bot.name,
-      ownerId: ownerId,
+      userId: userId,
       type: "CONTROLLED",
       status: "inactive",
       entryNodeId: entryNodeObjectId,

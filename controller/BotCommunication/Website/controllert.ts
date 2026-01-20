@@ -7,6 +7,7 @@ import OpenAI from "openai";
 import { BotAnalyticsModel } from "../../../Models/BotAnalytics.js";
 import type mongoose from "mongoose";
 import crypto from "crypto";
+import { ControlledBotModel } from "../../../Models/ControlledBotSchema.js";
 
 export const analyticsInsertionHelper = async(botId : any, apiHashKey : string, model : string, latency : number, tokenIn : number, tokenOut : number, totalToken : number, eventType : string) : Promise<void> => {
     try{
@@ -200,14 +201,14 @@ Bot: ${example.answer || ""}`)
 
             const message = response.choices[0] === undefined  ? {content : "Something went Wrong!"} : response.choices[0].message;
 
-            if (message.tool_calls && message.tool_calls.length > 0) {
+            if ((message as any).tool_calls && (message as any).tool_calls.length > 0) {
                 messages.push({
                     role: "assistant",
                     content: message.content || "",
-                    tool_calls: message.tool_calls as any,
+                    tool_calls: (message as any).tool_calls as any,
                 });
 
-                for (const toolCall of message.tool_calls) {
+                for (const toolCall of (message as any).tool_calls) {
                     try {
                         let toolResult = "";
 
@@ -296,6 +297,63 @@ Bot: ${example.answer || ""}`)
     }
     catch(e){
         console.error("Error in freestyleWebsiteBotController:", e);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+
+
+export const controlledStyleWebsiteBotController = async(req : Request, res : Response) : Promise<Response> =>{
+    try{
+        //getting and validating data of bot.
+        const { botId } = req.body;
+        if(!botId){
+            return res.status(400).json({ message : "Bot ID is required."});
+        }
+
+        let { sessionId } = req.cookies;
+        if(!sessionId){
+            const generatedId = crypto.randomUUID();
+            sessionId = generatedId;
+            res.cookie('sessionId', generatedId, {
+                maxAge : 60*60*1000,//1 hour
+            });
+        };
+        //until here we gets and validate bot data.
+
+        //creating bot details and session details redis keys for fetching first node of data from either redis or db.
+        const redis = getRedisClient();
+        const redisKeyForBot = `controlledWebsiteBotFirstNode:${botId}`;
+        const sessionalRedisKey = `controlledWebsiteBotSessionDetail:${botId}:${sessionId}`;
+
+        let botDetails = await redis.get(redisKeyForBot);
+        if(!botDetails){
+            const botDBDetails = await ControlledBotModel.findById(botId);
+            if(!botDBDetails){
+                return res.status(404).json({ message : "Bot not found."});
+            }
+            botDetails = {
+                name : botDBDetails.name,
+                status : botDBDetails.status,
+                platform : botDBDetails.platform,
+                entryNodeId : botDBDetails.entryNodeId,
+            };
+
+            if(!botDetails ||  (botDetails as any).status !== 'active'){
+                return res.status(403).json({ message : "Bot is not active."});
+            };
+
+            await redis.set(redisKeyForBot, JSON.stringify(botDetails), { ex: 3600 });//set for 1 hr. 
+        }
+
+        const sessionalBotDetails = await redis.get(sessionalRedisKey);
+
+
+
+        return res.status(200).json({ message: "Controlled Style Website Bot Controller - To be implemented." });
+    }
+    catch(e){
+        console.error("Error in controlledStyleWebsiteBotController:", e);
         return res.status(500).json({ message: "Internal server error" });
     }
 }

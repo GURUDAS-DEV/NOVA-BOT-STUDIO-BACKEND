@@ -6,6 +6,7 @@ import { transistionBotLifecycle } from "../../utils/helper/botLifecycle.js";
 import { supabase } from "../../Database/postgresql.js";
 import { hash } from "bcrypt-ts";
 import { hashApiKey } from "../../utils/helper/APIKeyHashing.js";
+import { ControlledBotModel } from "../../Models/ControlledBotSchema.js";
 
 
 export const startBotController = async(req : Request, res : Response) : Promise<Response> => {
@@ -16,12 +17,14 @@ export const startBotController = async(req : Request, res : Response) : Promise
         if(!botId || !userId){
             return res.status(400).json({ message : "Bot ID and User ID are required."});
         }
-        const botDetails = await BotStructureModel.findById(botId);
+        let botDetails = await BotStructureModel.findById(botId);
         if(!botDetails){
-            return res.status(404).json({ message : "Bot not found."});
+            botDetails = await ControlledBotModel.findById(botId);
+            if(!botDetails)
+                return res.status(404).json({ message : "Bot not found."});
         }
 
-        if(botDetails.userId !== userId){
+        if(botDetails?.userId !== userId){
             return res.status(403).json({ message : "Unauthorized access to the bot."});
         }
 

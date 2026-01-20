@@ -4,6 +4,7 @@ import { supabase } from "../../Database/postgresql.js";
 import { generateAPIKey } from "../../utils/helper/APIKeyGenerator.js";
 import { hashApiKey } from "../../utils/helper/APIKeyHashing.js";
 import { getRedisClient } from "../../Redis/connect.js";
+import { ControlledBotModel } from "../../Models/ControlledBotSchema.js";
 
 
 export const APIKeyForWebsiteController = async(req : Request, res : Response) : Promise<Response> => {
@@ -41,9 +42,11 @@ export const GenerateNewApiKeyForWebsiteController = async(req : Request, res : 
             return res.status(400).json({ message : "User ID and Bot ID are required."});
         }
 
-        const bot = await BotStructureModel.findOne({ _id: botId, platform: 'Website' });
+        let bot = await BotStructureModel.findOne({ _id: botId, platform: 'Website' });
         if(!bot){
-            return res.status(404).json({ message : "Bot not found."});
+            bot = await ControlledBotModel.findOne({ _id: botId, platform: 'Website' });
+            if(!bot)
+                return res.status(404).json({ message : "Bot not found."});
         }
 
         console.log(botId);
@@ -51,7 +54,7 @@ export const GenerateNewApiKeyForWebsiteController = async(req : Request, res : 
 
         const redis = getRedisClient();
         if(data && data.length > 0){
-            await redis.del(`apiKey:${data[0].HashedApiKey}`); //delete cached api key if exists
+            await redis.del(`apiKey:${(data[0] as any).HashedApiKey}`); //delete cached api key if exists
         }
 
         console.log(data);
