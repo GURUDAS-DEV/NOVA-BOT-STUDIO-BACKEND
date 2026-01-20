@@ -1,5 +1,5 @@
 # NOVA‑BOT‑STUDIO‑BACKEND  
-![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue)
+![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue) ![Version](https://img.shields.io/github/v/tag/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND?label=version)
 
 **A modular, TypeScript‑based backend for managing AI bots, API keys, user authentication, and bot analytics.**  
 
@@ -378,4 +378,11 @@ We welcome contributions! Please follow these steps:
 
 * Keep changes focused – one feature or bug‑fix per PR.  
 * Update documentation (README, inline JSDoc, Swagger if applicable).  
-* Ensure new endpoints have proper validation and error handling
+* Ensure new endpoints have proper validation and error handling.  
+
+---  
+
+## Roadmap  
+
+| Milestone | Target Release | Description |
+|-----------
