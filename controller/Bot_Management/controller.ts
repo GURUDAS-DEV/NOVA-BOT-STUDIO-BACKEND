@@ -332,67 +332,54 @@ export const createWebsiteControlledBotController = async (
       return res.status(401).json({ message: "Unauthorized: User ID is required" });
     }
 
-    // Validate request body structure
-    const { bot, graph } = req.body;
+    // Extract bot object from request body
+    const {bot} = req.body;
+
+    // Validate bot structure
     if (!bot || typeof bot !== "object") {
       await session.abortTransaction();
-      return res.status(400).json({ message: "Bot metadata is required" });
+      return res.status(400).json({ message: "Bot data is required" });
     }
 
     if (!bot.name || typeof bot.name !== "string") {
       await session.abortTransaction();
-      return res.status(400).json({ message: "Bot name is required and must be a string" });
+      return res.status(400).json({ message: "Bot name is required" });
     }
 
-    if (!graph || typeof graph !== "object") {
-      await session.abortTransaction();
-      return res.status(400).json({ message: "Graph structure is required" });
-    }
-
-    if (!Array.isArray(graph.nodes) || graph.nodes.length === 0) {
+    if (!Array.isArray(bot.nodes) || bot.nodes.length === 0) {
       await session.abortTransaction();
       return res.status(400).json({ message: "At least one node is required" });
     }
 
-    if (!Array.isArray(graph.edges)) {
-      await session.abortTransaction();
-      return res.status(400).json({ message: "Edges array is required" });
-    }
-
-    // Validate entry node
-    const entryNodeTempId = bot.entryNodeTempId || bot.entryNodeId || graph.nodes[0]?.id;
-    if (!entryNodeTempId) {
-      await session.abortTransaction();
-      return res.status(400).json({ message: "Entry node ID must be specified or first node will be used" });
-    }
-
-    const entryNodeExists = graph.nodes.some((n: any) => n.id === entryNodeTempId);
-    if (!entryNodeExists) {
-      await session.abortTransaction();
-      return res.status(400).json({ message: "Entry node ID does not exist in nodes array" });
-    }
-
-    // Step 1: Build tempId → MongoDB ObjectId mapping
+    // Step 1: Build tempId → MongoDB ObjectId mapping for all nodes
     const tempIdToObjectId: Record<string, mongoose.Types.ObjectId> = {};
-    graph.nodes.forEach((node: any) => {
+    bot.nodes.forEach((node: any) => {
       tempIdToObjectId[node.id] = new mongoose.Types.ObjectId();
     });
 
-    // Step 2: Create Bot document first
+    // Step 2: Determine entry node (first node by default)
+    const entryNodeTempId = bot.nodes[0]?.id;
+    if (!entryNodeTempId) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: "Entry node could not be determined" });
+    }
+
     const entryNodeObjectId = tempIdToObjectId[entryNodeTempId];
+
+    // Step 3: Create ControlledBot document
     const controlledBot = new ControlledBotModel({
       name: bot.name,
-      ownerId: new mongoose.Types.ObjectId(ownerId),
+      ownerId: ownerId,
       type: "CONTROLLED",
-      status: bot.status || "draft",
+      status: "inactive",
       entryNodeId: entryNodeObjectId,
     });
 
     const savedBot = await controlledBot.save({ session });
     const botId = savedBot._id;
 
-    // Step 3: Transform nodes to database schema and insert
-    const nodeDocuments = graph.nodes.map((node: any) => {
+    // Step 4: Transform and insert nodes
+    const nodeDocuments = bot.nodes.map((node: any) => {
       const nodeDoc: any = {
         _id: tempIdToObjectId[node.id],
         botId,
@@ -406,7 +393,7 @@ export const createWebsiteControlledBotController = async (
         },
       };
 
-      // Map executor type based on node structure
+      // Determine executor type
       if (node.executor?.type === "input") {
         nodeDoc.executor = "input";
         nodeDoc.inputConfig = {
@@ -418,7 +405,7 @@ export const createWebsiteControlledBotController = async (
       } else if (node.executor?.type === "api") {
         nodeDoc.executor = "api";
         nodeDoc.apiConfig = {
-          endpointKey: node.executor?.config?.endpointKey,
+          endpointKey: node.executor?.config?.endpointKey || "default",
           method: node.executor?.config?.method || "GET",
           timeoutMs: node.executor?.config?.timeoutMs || 5000,
           saveResponseAs: node.executor?.config?.saveResponseAs,
@@ -426,7 +413,10 @@ export const createWebsiteControlledBotController = async (
         };
       } else if (node.executor?.type === "llm") {
         nodeDoc.executor = "llm";
-      } else if (node.options && node.options.length === 0 && !node.executor) {
+      } else if (
+        (!node.options || node.options.length === 0) &&
+        (!node.executor || node.executor.type === "none")
+      ) {
         nodeDoc.executor = "end";
       }
 
@@ -435,63 +425,76 @@ export const createWebsiteControlledBotController = async (
 
     await ControlledBotNodeModel.insertMany(nodeDocuments, { session });
 
-    // Step 4: Transform and insert edges (derived from node options and explicit edge array)
-    const edgeSet = new Map<string, any>(); // Use Map to avoid duplicates
+    // Step 5: Extract and insert edges from node options
+    const edgeSet = new Map<string, any>();
 
-    // Process explicit edges from graph.edges
-    if (graph.edges && graph.edges.length > 0) {
-      graph.edges.forEach((edge: any, index: number) => {
-        const fromNodeId = tempIdToObjectId[edge.fromTempNodeId];
-        const toNodeId = tempIdToObjectId[edge.toTempNodeId];
-
-        if (fromNodeId && toNodeId) {
-          const key = `${fromNodeId}-${toNodeId}`;
-          edgeSet.set(key, {
-            botId,
-            fromNodeId,
-            toNodeId,
-            intent: edge.intent || `Option ${index + 1}`,
-            order: edge.order ?? index,
-          });
-        }
-      });
-    }
-
-    // Also process options from nodes if they contain nextNodeId
-    graph.nodes.forEach((node: any) => {
+    bot.nodes.forEach((node: any) => {
       if (node.options && Array.isArray(node.options)) {
         const fromNodeId = tempIdToObjectId[node.id];
 
         node.options.forEach((option: any, optionIndex: number) => {
           const nextNodeId = option.nextNodeId;
+
+          // Only create edge if nextNodeId is non-empty
           if (nextNodeId && nextNodeId.trim() !== "") {
             const toNodeId = tempIdToObjectId[nextNodeId];
 
             if (fromNodeId && toNodeId) {
-              const key = `${fromNodeId}-${toNodeId}`;
-              // Only add if not already in set (explicit edges take precedence)
-              if (!edgeSet.has(key)) {
-                edgeSet.set(key, {
-                  botId,
-                  fromNodeId,
-                  toNodeId,
-                  intent: option.label || `Option: ${option.id}`,
-                  order: optionIndex,
-                });
-              }
+              const key = `${fromNodeId}-${toNodeId}-${optionIndex}`;
+              edgeSet.set(key, {
+                botId,
+                fromNodeId,
+                toNodeId,
+                intent: option.label || `Option ${optionIndex + 1}`,
+                order: optionIndex,
+              });
             }
           }
         });
       }
+
+      // Handle input node routing
+      if (node.inputNextNodeId && node.inputNextNodeId.trim() !== "") {
+        const fromNodeId = tempIdToObjectId[node.id];
+        const toNodeId = tempIdToObjectId[node.inputNextNodeId];
+
+        if (fromNodeId && toNodeId) {
+          const key = `${fromNodeId}-${toNodeId}-input`;
+          edgeSet.set(key, {
+            botId,
+            fromNodeId,
+            toNodeId,
+            intent: "User Input",
+            order: 0,
+          });
+        }
+      }
+
+      // Handle API response mapping routing
+      if (node.apiResponseMapping?.nextNodeId && node.apiResponseMapping.nextNodeId.trim() !== "") {
+        const fromNodeId = tempIdToObjectId[node.id];
+        const toNodeId = tempIdToObjectId[node.apiResponseMapping.nextNodeId];
+
+        if (fromNodeId && toNodeId) {
+          const key = `${fromNodeId}-${toNodeId}-api`;
+          edgeSet.set(key, {
+            botId,
+            fromNodeId,
+            toNodeId,
+            intent: "API Response",
+            order: 0,
+          });
+        }
+      }
     });
 
-    // Insert edges if any exist
+    // Insert edges
     if (edgeSet.size > 0) {
       const edgeDocuments = Array.from(edgeSet.values());
       await ControlledBotEdgeModel.insertMany(edgeDocuments, { session });
     }
 
-    // Step 5: Commit transaction
+    // Step 6: Commit transaction
     await session.commitTransaction();
 
     return res.status(201).json({
@@ -502,7 +505,7 @@ export const createWebsiteControlledBotController = async (
         type: savedBot.type,
         status: savedBot.status,
         entryNodeId: savedBot.entryNodeId,
-        nodesCreated: graph.nodes.length,
+        nodesCreated: bot.nodes.length,
         edgesCreated: edgeSet.size,
       },
     });

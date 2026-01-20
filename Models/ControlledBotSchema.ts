@@ -2,7 +2,7 @@ import { Schema, model, Types } from "mongoose";
 
 const BotSchema = new Schema({
   name: { type: String, required: true },
-  ownerId: { type: Types.ObjectId, required: true },
+  ownerId: { type: String, required: true },
 
   type: {
     type: String,
