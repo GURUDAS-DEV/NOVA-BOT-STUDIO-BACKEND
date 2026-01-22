@@ -32,7 +32,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
 | **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. | ✅ Stable |
 | **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats. | ✅ Stable |
-| **Multi‑DB Support** | PostgreSQL (via `pg`) & MongoDB (via `mongoose`). | ✅ Stable |
+| **Multi‑DB Support** | PostgreSQL (`pg`) & MongoDB (`mongoose`). | ✅ Stable |
 | **Redis Caching** | Centralised client for API‑key validation, session storage, and bot messaging. | ✅ Stable |
 | **CORS Configuration** | Whitelisted origins with credentials support. | ✅ Stable |
 | **Testing Utilities** | Ready‑made test router and controller for CI pipelines. | ✅ Stable |
@@ -98,7 +98,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 * **Routers** – each feature lives in its own router file, mounted under a versioned `/api/` namespace.  
 * **Controllers** – thin layers that orchestrate service calls, keeping routers declarative.  
 * **Middleware** – protects routes (`accessMiddleware`, `authMiddleware`).  
-* **Redis** – powers both API‑key caching *and* the real‑time website‑bot communication channel.
+* **Redis** – powers both API‑key caching *and* the real‑time website‑bot communication channel.  
 
 ---  
 
@@ -316,7 +316,6 @@ All routes under `/api/` (except `/auth/*`) require a valid `refreshToken` cooki
 ### Setup  
 
 ```bash
-# Install dev dependencies (already done via npm ci)
 npm run dev   # starts ts-node-dev with hot reload
 ```
 
@@ -377,7 +376,7 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 
 ### Performance considerations  
 
-* Enable HTTP keep‑alive (`app.use(require('helmet')())`).  
+* Enable HTTP security headers: `app.use(require('helmet')())`.  
 * Tune PostgreSQL connection pool (`max` in `pg.Pool`).  
 * Adjust Redis `maxmemory-policy` based on your caching strategy.  
 
@@ -389,30 +388,4 @@ We welcome contributions! Please follow these steps:
 
 1. **Fork** the repository and create a feature branch.  
 2. **Install** the project locally (see *Installation* above).  
-3. **Run tests** and ensure they all pass: `npm test`.  
-4. **Add** unit/integration tests for new functionality.  
-5. **Lint** your code: `npm run lint`.  
-6. **Submit** a Pull Request with a clear description of the change.  
-
-### Development workflow  
-
-| Command | Purpose |
-|---------|---------|
-| `npm run dev` | Start the server with hot‑reloading (TS). |
-| `npm run build` | Compile TypeScript to `dist/`. |
-| `npm start` | Run the compiled production build. |
-| `npm test` | Execute Jest test suite. |
-| `npm run lint` | Run ESLint. |
-| `npm run format` | Run Prettier. |
-
-### Code style  
-
-* Use **Airbnb** TypeScript style (configured via ESLint).  
-* Prefer `async/await` over raw promises.  
-* Keep controller functions thin – delegate business logic to service/helper modules.  
-
----  
-
-## License & Credits  
-
-**License:** MIT –
+3. **Run
