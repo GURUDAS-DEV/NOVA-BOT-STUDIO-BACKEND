@@ -6,56 +6,59 @@
 ---  
 
 ## Overview  
+
 NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for building and operating bot‑centric applications. It supports:
 
 * **Bot lifecycle management** – create, update, delete, and run bots.  
 * **AI feature toggling** – enable/disable advanced AI capabilities per bot.  
-* **Secure API‑key handling** – generation, hashing, and revocation.  
-* **Robust authentication** – JWT‑based login/registration with refresh tokens.  
+* **Secure API‑key handling** – generation, hashing, and revocation with Redis‑backed caching.  
+* **Robust authentication** – JWT‑based login/registration with refresh tokens and role‑based middleware.  
 * **Bot analytics** – collect, store, and query usage metrics per bot.  
 * **Multi‑database support** – PostgreSQL for relational data, MongoDB for flexible storage.  
-* **Redis caching** – fast look‑ups for API‑key validation, session data, and website‑bot communication.  
+* **Redis integration** – fast look‑ups for API‑key validation, session data, and real‑time website‑bot communication.  
 
-Targeted at developers building SaaS bot platforms, internal automation tools, or any service that needs programmable bots with fine‑grained access control and insight into bot performance.
+Targeted at developers building SaaS bot platforms, internal automation tools, or any service that needs programmable bots with fine‑grained access control and insight into bot performance.  
 
 ---  
 
 ## Features  
+
 | Feature | Description | Status |
 |---------|-------------|--------|
 | **Authentication** | JWT login, registration, refresh tokens, role‑based middleware. | ✅ Stable |
 | **API‑Key Management** | Secure generation, hashing, revocation, Redis‑backed lookup. | ✅ Stable |
 | **Bot Configuration** | CRUD for bot metadata, custom prompts, and system settings. | ✅ Stable |
-| **Bot Configuration Retrieval** | `GET /botConfig/getConfig/:botId` – fetch a bot’s stored configuration (protected). | ✅ Stable |
 | **AI Feature Management** | Toggle AI modules (e.g., text‑enhancer, validator) per bot. | ✅ Stable |
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
-| **Website Bot Communication** | Dedicated router (`/websiteBot/`) for real‑time website‑bot interactions, now backed by Redis for low‑latency messaging. | ✅ Stable |
-| **Redis Integration** | Centralised Redis client for caching API keys, session data, and bot‑communication payloads. | ✅ Stable |
-| **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats via `/botAnalytics/` endpoints. | ✅ Stable |
-| **Multi‑DB Support** | PostgreSQL (via `pg`) & MongoDB (via `mongoose`) – both initialized on server start. | ✅ Stable |
-| **CORS Configuration** | Whitelisted origins (`http://localhost:3000`) with credentials support. | ✅ Stable |
+| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. | ✅ Stable |
+| **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats. | ✅ Stable |
+| **Multi‑DB Support** | PostgreSQL (via `pg`) & MongoDB (via `mongoose`). | ✅ Stable |
+| **Redis Caching** | Centralised client for API‑key validation, session storage, and bot messaging. | ✅ Stable |
+| **CORS Configuration** | Whitelisted origins with credentials support. | ✅ Stable |
 | **Testing Utilities** | Ready‑made test router and controller for CI pipelines. | ✅ Stable |
 
 ---  
 
 ## Tech Stack  
+
 | Layer | Technology | Reason |
 |-------|------------|--------|
 | **Runtime** | Node.js 18 LTS | Modern async APIs, wide ecosystem |
 | **Language** | TypeScript 5 | Static typing, IDE support |
 | **Web Framework** | Express 4 | Minimalist, middleware‑centric |
-| **Database** | PostgreSQL (via `pg`) & MongoDB (via `mongoose`) | Relational + flexible document storage |
-| **Cache** | Redis (via `ioredis`) | Fast key‑value look‑ups for API‑key validation & bot messaging |
+| **Database** | PostgreSQL (`pg`) & MongoDB (`mongoose`) | Relational + flexible document storage |
+| **Cache** | Redis (`ioredis`) | Fast key‑value look‑ups for API‑key validation & bot messaging |
 | **Authentication** | `jsonwebtoken`, `bcrypt` | Secure token handling |
 | **Validation / Sanitisation** | `class-validator`, custom sanitiser helpers | Prevent injection attacks |
-| **Testing** | Jest & Supertest (dev dependencies) | Unit & integration testing |
-| **Containerisation** | Docker (optional) | Consistent dev/prod environments |
-| **CI/CD** | GitHub Actions (lint, test, build) | Automated quality gates |
+| **Testing** | Jest & Supertest | Unit & integration testing |
+| **Containerisation** | Docker | Consistent dev/prod environments |
+| **CI/CD** | GitHub Actions | Automated lint, test, build pipelines |
 | **Utilities** | System Prompt utils (`TextEnhancer`, `TextValidator`, `ExampleValidator`, `Website`) | Reusable AI‑prompt processing helpers |
 
 ---  
 
 ## Architecture  
+
 ```
 /
 ├─ Database/                # PostgreSQL & MongoDB init helpers
@@ -65,7 +68,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 ├─ Models/                  # Mongoose schemas & TypeORM entities
 │   ├─ BotAnalytics.ts
 │   └─ (other models)
-├─ Router/                  # Feature‑specific routers
+├─ Router/                  # Feature‑specific routers (mounted under /api/)
 │   ├─ Authentication/
 │   ├─ API_Key_Management/
 │   ├─ Bot_Management/
@@ -87,21 +90,22 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 │   └─ Testing/
 ├─ utils/                   # Helpers (JWT, validation, system‑prompt utils, etc.)
 ├─ Static/                  # Assets (logo, etc.)
-├─ index.ts                 # Server bootstrap
+├─ index.ts                 # Server bootstrap (CORS, parsers, DB/Redis init, router registration)
 └─ .env.example             # Template for environment variables
 ```
 
-* **Entry point (`index.ts`)** – sets up CORS, cookie parser, JSON body parsing, initializes DBs, connects Redis, registers routers, and starts the HTTP server.  
+* **Entry point (`index.ts`)** – sets up CORS, cookie parser, JSON body parsing, initializes databases, connects Redis, registers routers, and starts the HTTP server.  
 * **Routers** – each feature lives in its own router file, mounted under a versioned `/api/` namespace.  
 * **Controllers** – thin layers that orchestrate service calls, keeping routers declarative.  
 * **Middleware** – protects routes (`accessMiddleware`, `authMiddleware`).  
-* **Redis** – powers both API‑key caching *and* the real‑time website‑bot communication channel, enabling sub‑millisecond message round‑trips.  
+* **Redis** – powers both API‑key caching *and* the real‑time website‑bot communication channel.
 
 ---  
 
-## Installation  
+## Getting Started  
 
 ### Prerequisites  
+
 | Tool | Minimum Version |
 |------|-----------------|
 | Node | 18.x |
@@ -111,35 +115,46 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | Redis | 6 |
 | Docker (optional) | 20.10+ |
 
-### Steps  
+### Installation  
 
 ```bash
-# 1️⃣ Clone the repo
+# 1️⃣ Clone the repository
 git clone https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND.git
 cd NOVA-BOT-STUDIO-BACKEND
 
 # 2️⃣ Install dependencies
 npm ci   # or `yarn install`
 
-# 3️⃣ Set up environment variables
-cp .env.example .env   # then edit .env with your DB credentials, JWT secret, etc.
-
-# 4️⃣ Initialise databases (run migrations if needed) – see Database/README for details
-
-# 5️⃣ Start the server (development)
-npm run dev   # uses ts-node-dev for hot‑reloading
-
-# 6️⃣ Or build & run for production
-npm run build && npm start
+# 3️⃣ Prepare environment variables
+cp .env.example .env
+# Edit .env with your DB credentials, JWT secrets, etc.
 ```
 
-#### Docker (recommended)  
+#### Database setup  
+
+*PostgreSQL* – run any required migrations (if you add them) or let the app create tables on first launch.  
+*MongoDB* – ensure the database exists; the app will create collections automatically.  
+
+#### Run locally (development)  
+
+```bash
+npm run dev   # uses ts-node-dev for hot‑reloading
+```
+
+#### Build & run (production)  
+
+```bash
+npm run build
+npm start
+```
+
+### Docker (recommended)  
 
 ```bash
 # Build the image
 docker build -t nova-bot-studio-backend .
 
-# Run the container
+# Run the container (exposes port 9000)
 docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ```
 
@@ -157,7 +172,7 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 | `JWT_REFRESH_SECRET` | Secret for refresh tokens | `supersecretrefresh` |
 | `CORS_ORIGINS` | Comma‑separated list of allowed origins | `http://localhost:3000` |
 
-*Example `.env` snippet*  
+**Example `.env` snippet**
 
 ```dotenv
 PORT=9000
@@ -173,14 +188,6 @@ CORS_ORIGINS=http://localhost:3000
 
 ## Usage  
 
-### Running locally  
-
-```bash
-npm run dev
-```
-
-The API will be reachable at `http://localhost:9000`.
-
 ### Health check  
 
 ```bash
@@ -188,7 +195,7 @@ curl http://localhost:9000/ping
 # => {"message":"Pong!"}
 ```
 
-### Example: Register & Login  
+### Register & login (TypeScript example)
 
 ```typescript
 import axios from 'axios';
@@ -198,14 +205,19 @@ await axios.post('http://localhost:9000/api/auth/register', {
   password: 'StrongP@ssw0rd',
 });
 
-const loginRes = await axios.post('http://localhost:9000/api/auth/login', {
-  email: 'dev@example.com',
-  password: 'StrongP@ssw0rd',
-});
-const { accessToken, refreshToken } = loginRes.data;
+const { data: loginRes } = await axios.post(
+  'http://localhost:9000/api/auth/login',
+  {
+    email: 'dev@example.com',
+    password: 'StrongP@ssw0rd',
+  },
+  { withCredentials: true }
+);
+
+const { accessToken, refreshToken } = loginRes;
 ```
 
-### Example: Call a protected endpoint  
+### Call a protected endpoint  
 
 ```typescript
 await axios.get('http://localhost:9000/api/bot/', {
@@ -214,41 +226,49 @@ await axios.get('http://localhost:9000/api/bot/', {
 });
 ```
 
-### Example: Retrieve a Bot Configuration  
+### Retrieve a Bot Configuration  
 
 ```typescript
-await axios.get('http://localhost:9000/api/botConfig/getConfig/12345', {
-  headers: { Cookie: `refreshToken=${refreshToken}` },
-  withCredentials: true,
-});
+await axios.get(
+  'http://localhost:9000/api/botConfig/getConfig/12345',
+  {
+    headers: { Cookie: `refreshToken=${refreshToken}` },
+    withCredentials: true,
+  }
+);
 ```
 
-### Example: Fetch Bot Analytics  
+### Fetch Bot Analytics  
 
 ```typescript
-await axios.get('http://localhost:9000/api/botAnalytics/summary/12345', {
-  headers: { Cookie: `refreshToken=${refreshToken}` },
-  withCredentials: true,
-});
+await axios.get(
+  'http://localhost:9000/api/botAnalytics/summary/12345',
+  {
+    headers: { Cookie: `refreshToken=${refreshToken}` },
+    withCredentials: true,
+  }
+);
 ```
 
-### Website Bot Communication  
-
-The router `websiteBot/` serves endpoints used by front‑end widgets to interact with a bot in real time. Thanks to Redis integration, messages are queued and responded to with sub‑millisecond latency.
+### Website Bot Communication (real‑time)  
 
 ```bash
 POST http://localhost:9000/websiteBot/message
+Content-Type: application/json
+
 {
   "botId": "12345",
   "userMessage": "Hello!"
 }
 ```
 
+The response contains the bot’s reply and a status flag.
+
 ---  
 
 ## API Documentation  
 
-> Base URL: `http://<host>:<port>/api/`
+> **Base URL:** `http://<host>:<port>/api/`  
 
 | Category | Method | Endpoint | Description |
 |----------|--------|----------|-------------|
@@ -260,7 +280,7 @@ POST http://localhost:9000/websiteBot/message
 | | `DELETE` | `/APIKeyManagement/:id` | Revoke an API key |
 | **Bot Config** | `POST` | `/botConfig/` | Create bot configuration |
 | | `GET` | `/botConfig/` | List bot configurations |
-| | `GET` | `/botConfig/getConfig/:botId` | **Fetch a specific bot’s configuration** (protected) |
+| | `GET` | `/botConfig/getConfig/:botId` | Fetch a specific bot’s configuration (protected) |
 | | `PUT` | `/botConfig/:id` | Update a bot configuration |
 | | `DELETE` | `/botConfig/:id` | Delete a bot configuration |
 | **Bot Management** | `GET` | `/bot/` | Retrieve bots owned by the authenticated user |
@@ -275,9 +295,11 @@ POST http://localhost:9000/websiteBot/message
 | | `GET` | `/botAnalytics/events/:botId` | List raw analytics events (protected) |
 | **Testing** | `GET` | `/testing/ping` | Simple health check for test environment |
 
-**Authentication** – All routes under `/api/` (except `/auth/*`) require a valid `refreshToken` cookie. The middleware validates the JWT and injects `req.user`.
+### Authentication  
 
-**Error format**
+All routes under `/api/` (except `/auth/*`) require a valid `refreshToken` cookie. The `authMiddleware` validates the JWT, attaches `req.user`, and enforces role‑based access when configured.
+
+### Error format  
 
 ```json
 {
@@ -298,7 +320,7 @@ POST http://localhost:9000/websiteBot/message
 npm run dev   # starts ts-node-dev with hot reload
 ```
 
-### Running tests  
+### Testing  
 
 ```bash
 npm test
@@ -315,15 +337,82 @@ npm run format        # Prettier
 
 * Enable request logging: `DEBUG=express:* npm run dev`.  
 * Inspect Redis keys with `redis-cli` (e.g., `KEYS apiKey:*` or `KEYS websiteBot:*`).  
-* Use VS Code’s “Attach to Node Process” for step‑through debugging of TypeScript sources.
+* Use VS Code’s “Attach to Node Process” for step‑through debugging of TypeScript sources.  
 
 ---  
 
 ## Deployment  
 
-### Docker (recommended)  
+### Docker (production)  
 
 ```dockerfile
 # Dockerfile
 FROM node:18-alpine AS builder
-WORKDIR
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY . .
+RUN npm run build
+
+FROM node:18-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package*.json ./
+ENV NODE_ENV=production
+EXPOSE 9000
+CMD ["node", "dist/index.js"]
+```
+
+Build & run:
+
+```bash
+docker build -t nova-bot-studio-backend .
+docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
+```
+
+### Cloud platforms  
+
+* **Heroku / Render** – set the same environment variables, point the start command to `npm start`.  
+* **AWS ECS / Fargate** – use the Docker image above; configure a load balancer to forward traffic to port 9000.  
+
+### Performance considerations  
+
+* Enable HTTP keep‑alive (`app.use(require('helmet')())`).  
+* Tune PostgreSQL connection pool (`max` in `pg.Pool`).  
+* Adjust Redis `maxmemory-policy` based on your caching strategy.  
+
+---  
+
+## Contributing  
+
+We welcome contributions! Please follow these steps:
+
+1. **Fork** the repository and create a feature branch.  
+2. **Install** the project locally (see *Installation* above).  
+3. **Run tests** and ensure they all pass: `npm test`.  
+4. **Add** unit/integration tests for new functionality.  
+5. **Lint** your code: `npm run lint`.  
+6. **Submit** a Pull Request with a clear description of the change.  
+
+### Development workflow  
+
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Start the server with hot‑reloading (TS). |
+| `npm run build` | Compile TypeScript to `dist/`. |
+| `npm start` | Run the compiled production build. |
+| `npm test` | Execute Jest test suite. |
+| `npm run lint` | Run ESLint. |
+| `npm run format` | Run Prettier. |
+
+### Code style  
+
+* Use **Airbnb** TypeScript style (configured via ESLint).  
+* Prefer `async/await` over raw promises.  
+* Keep controller functions thin – delegate business logic to service/helper modules.  
+
+---  
+
+## License & Credits  
+
+**License:** MIT –
