@@ -80,7 +80,7 @@ Bot: ${example.answer || ""}`)
                 return res.status(500).json({ error: "Failed to get response from OpenAI" });
             }
 
-            const message = response.choices[0].message;
+            const message = (response.choices[0] as any).message;
 
             // Check if LLM is requesting a tool call
             if (message.tool_calls && message.tool_calls.length > 0) {
@@ -148,3 +148,5 @@ Bot: ${example.answer || ""}`)
         return res.status(500).json({ message: "Internal server error" });
     }
 };
+
+

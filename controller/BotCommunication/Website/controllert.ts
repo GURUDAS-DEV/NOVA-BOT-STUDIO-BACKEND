@@ -444,11 +444,19 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
             }
         } else {
             // Existing session - continue from current node
-            const { input } = req.body;
+            const { input, GO_BACK, END_CHAT } = req.body;
             const sessionCurrentNodeId = (sessionalBotDetails as any)?.currentNodeId;
 
             if (!sessionCurrentNodeId) {
                 return res.status(500).json({ message: "Session data is corrupted. Please start a new session." });
+            }
+
+            // Handle END_CHAT universally
+            if (END_CHAT) {
+                try { await redis.del(sessionalRedisKey);
+                    res.clearCookie('sessionId');
+                 } catch {}
+                return res.status(200).json({ message: "Conversation ended. Thank you!" });
             }
 
             let currentNodeDataFromRedis = await getFromRedisStringOnly(redisKeyForNodes(sessionCurrentNodeId));
@@ -465,6 +473,37 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
             const currentNodeData = currentNodeDataFromRedis?.currentNode;
             if (!currentNodeData) {
                 return res.status(500).json({ message: "Current node data is corrupted. Please start a new session." });
+            }
+
+            // Handle GO_BACK universally (across executors)
+            if (GO_BACK) {
+                const previousNodeId = (sessionalBotDetails as any)?.previousNodeId;
+                if (!previousNodeId) {
+                    return res.status(400).json({ message: "No previous node to go back to." });
+                }
+                let previousNodeDataFromRedis = await getFromRedisStringOnly(redisKeyForNodes(previousNodeId.toString()));
+                if (!previousNodeDataFromRedis) {
+                    const previousNodeDataFromDb = await ControlledBotNodeModel.findOne({ _id: previousNodeId, botId: botId });
+                    if (!previousNodeDataFromDb) {
+                        return res.status(500).json({ message: "Previous node data not found. Please start a new session." });
+                    }
+                    previousNodeDataFromRedis = await cacheNodeByType(previousNodeDataFromDb, previousNodeId.toString(), botId, redisKeyForNodes);
+                    previousNodeDataFromRedis = previousNodeDataFromDb as any;
+                }
+                previousNodeDataFromRedis = previousNodeDataFromRedis;
+                await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: previousNodeId.toString(), previousNodeId: null }), { ex: 60 * 60 * 1000 });
+
+                console.log("Previous Node Data from Redis:(inside, 496)", previousNodeDataFromRedis);   
+                if (previousNodeDataFromRedis?.currentNode.executor === 'none' && previousNodeDataFromRedis?.currentNode?.output?.mode === 'options') {
+                    console.log("Previous Node Data Options:(inside, 499)", previousNodeDataFromRedis.options);
+                    return res.status(200).json({ type: "options", nodeData1: previousNodeDataFromRedis });
+                } else if (previousNodeDataFromRedis?.currentNode.executor === 'none' && previousNodeDataFromRedis?.currentNode?.output?.mode === 'text') {
+                    console.log("Previous Node Data Options:(inside, 501)", previousNodeDataFromRedis.options);
+                    return res.status(200).json({ type: "text", nodeData2: previousNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                } else if (previousNodeDataFromRedis?.currentNode.executor === 'input') {
+                    console.log("Previous Node Data Options:(inside, 503)", previousNodeDataFromRedis.options);
+                    return res.status(200).json({ type: "input", nodeData3: previousNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                }
             }
 
 
@@ -491,7 +530,8 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                 }
 
                 nextNodeDataFromRedis = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
-                // Return next nodex
+
+                // Return next node
                 if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
@@ -499,18 +539,50 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                 }
                 else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
-                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis });
+                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis.output.text, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
                 else if (nextNodeDataFromRedis?.executor === 'input') {
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
-                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis });
+                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
-                else if (nextNodeDataFromRedis?.currentNode?.executor === 'api') {
-                    // API executor - implementation left empty as requested
+                else if (nextNodeDataFromRedis?.executor === 'api') {
+                    const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
+                    const reqInfo = extractApiRequest(apiNode?.apiConfig);
+                    console.log("API Node Data:(inside, 571)", reqInfo);
+                    if (!reqInfo || !reqInfo.endpoint) {
+                        return res.status(500).json({ message: "API configuration is missing or invalid for the next node." });
+                    }
+                    const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
+                    const apiData = await callingConstructApiUponUserInput(fullApiUrl);
+                    const responseToSend = await generatingResponseFromApiResult(apiNode?.title || "API Node Response", apiData);
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "api", message: responseToSend, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
             }
             else if (currentNodeData.executor === 'none' && currentNodeData.output?.mode === 'text') {
+                const {GO_BACK, END_CHAT} = req.body;
+                if(GO_BACK){
+                    const previousNodeId = (sessionalBotDetails as any)?.previousNodeId;
+                    if (!previousNodeId) {
+                        return res.status(400).json({ message: "No previous node to go back to." });
+                    }
+                    let previousNodeDataFromRedis = await getFromRedisStringOnly(redisKeyForNodes(previousNodeId.toString()));
+                    if (!previousNodeDataFromRedis) {
+                        const previousNodeDataFromDb = await ControlledBotNodeModel.findOne({ _id: previousNodeId, botId: botId });
+                        if (!previousNodeDataFromDb) {
+                            return res.status(500).json({ message: "Previous node data not found. Please start a new session." });
+                        }
+                        // Cache the previous node
+                        previousNodeDataFromRedis = await cacheNodeByType(previousNodeDataFromDb, previousNodeId.toString(), botId, redisKeyForNodes);
+                        console.log("Previous Node Data from DB:", previousNodeDataFromDb);
+                        previousNodeDataFromRedis = previousNodeDataFromDb;
+                    };
+                    previousNodeDataFromRedis = previousNodeDataFromRedis?.currentNode || previousNodeDataFromRedis;
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: previousNodeId.toString(), previousNodeId: null }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "text", nodeData: previousNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                }
+
                 const nextNodeId = currentNodeData.output?.nextNodeId;
                 if (!nextNodeId) {
                     return res.status(500).json({ message: "Next node ID is not configured properly. Contact bot owner. Thanks for using us." });
@@ -535,20 +607,29 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                 }
                 else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
-                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis });
+                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
                 else if (nextNodeDataFromRedis?.executor === 'input') {
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
-                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis });
+                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
                 else if (nextNodeDataFromRedis?.executor === 'api') {
-                    // API executor - implementation left empty as requested
+                    const reqInfo = extractApiRequest((nextNodeDataFromRedis as any)?.apiConfig);
+                    if (!reqInfo || !reqInfo.endpoint) {
+                        return res.status(500).json({ message: "API configuration is missing or invalid for the next node." });
+                    }
+                    const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
+                    const apiData = await callingConstructApiUponUserInput(fullApiUrl);
+                    const responseToSend = await generatingResponseFromApiResult((nextNodeDataFromRedis as any)?.title || "API Node Response", apiData);
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "api", message: responseToSend, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
             }
             else if (currentNodeData.executor === 'input') {
                 if (!input) {
                     return res.status(400).json({ message: "A Valid Input is required for this node." });
                 }
+                
                 const nextNodeId = currentNodeData.inputConfig?.nextNodeId;
                 if (!nextNodeId) {
                     return res.status(500).json({ message: "Next node ID is not configured properly. Contact bot owner. Thanks for using us." });
@@ -570,23 +651,22 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
 
                 // Return next node
                 if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 * 1000 });
                     return res.status(200).json({ type: "options", nodeData: nextNodeDataFromRedis });
                 }
 
                 else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
-                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
                 else if (nextNodeDataFromRedis?.executor === 'input') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
-                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
                 else if (nextNodeDataFromRedis?.executor === 'api') {
-                    // console.log("input : ", input);
-                    // console.log("nextNodeDataFromRedis : ", nextNodeDataFromRedis);
+                    
                     const apiFormatFromLLM : apiConstructorTemplate = await constructApiUponUserInput(nextNodeDataFromRedis.apiConfig, input);
                     
                     if(!apiFormatFromLLM.success){
@@ -600,26 +680,28 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     const constructedApiEndpoint = apiFormatFromLLM.apiRequest?.endpoint || "";
                     const constructedApiQueryParams = apiFormatFromLLM.apiRequest?.queryParams || {};
                     const fullApiUrl = buildUrl(constructedApiEndpoint, constructedApiQueryParams);
-                    
+
                     const response = await callingConstructApiUponUserInput(fullApiUrl);
-                    // console.log("Raw API Response : ", response);
                     if(!response){
                         return res.status(500).json({ message: response || "API call failed. Please try again." });
                     }
 
                     const responseToSend = await generatingResponseFromApiResult(input, response);
-                    console.log("Final Response to user : ", responseToSend);
-
-                    return res.status(200).json({ message: responseToSend });
-                    
-                    // console.log("API Format from LLM : ", apiFormatFromLLM);
-
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "api", message: responseToSend, back : {label : "Go Back", _id : "GO_BACK"}, end : {label : "End Chat", _id : "END_CHAT"} });
                 }
 
                 return res.status(200).json({ message: "Current node expects user input. Please provide the required input." });
             }
             else if (currentNodeData.executor === 'api') {
-
+                const reqInfo = extractApiRequest((currentNodeData as any)?.apiConfig);
+                if (!reqInfo || !reqInfo.endpoint) {
+                    return res.status(500).json({ message: "API configuration is missing or invalid for the current node." });
+                }
+                const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
+                const apiData = await callingConstructApiUponUserInput(fullApiUrl);
+                const responseToSend = await generatingResponseFromApiResult((currentNodeData as any)?.title || "API Node Response", apiData);
+                return res.status(200).json({ type: "api", message: responseToSend, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
             }
 
         }
@@ -665,13 +747,11 @@ const processInitialNode = async (
     } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
         await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeData), { ex: 86400 });
         await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
-
-        return res.status(200).json({ type: "text", nodeData });
+        return res.status(200).json({ type: "text", nodeData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
     } else if (nodeData.executor === 'input') {
         await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeData), { ex: 86400 });
         await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
-
-        return res.status(200).json({ type: "input", nodeData });
+        return res.status(200).json({ type: "input", nodeData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
     } else if (nodeData.executor === 'api') {
         // API executor - implementation left empty as requested
     }
@@ -695,10 +775,10 @@ const processInitialNodeFromRedis = async (
         return res.status(200).json({ type: "options", nodeData: nodeDataFromRedis });
     } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
         await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
-        return res.status(200).json({ type: "text", nodeData });
+        return res.status(200).json({ type: "text", nodeData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
     } else if (nodeData.executor === 'input') {
         await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
-        return res.status(200).json({ type: "input", nodeData });
+        return res.status(200).json({ type: "input", nodeData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
     } else if (nodeData.executor === 'api') {
         // API executor - implementation left empty as requested
     }
@@ -740,7 +820,8 @@ const cacheNodeByType = async (
         await redis.set(redisKeyForNodes(nodeId), JSON.stringify({ currentNode: nodeData }), { ex: 86400 });
         return { currentNode: nodeData };
     } else if (nodeData.executor === 'api') {
-        // API executor - implementation left empty as requested
+        await redis.set(redisKeyForNodes(nodeId), JSON.stringify({ currentNode: nodeData }), { ex: 86400 });
+        return { currentNode: nodeData };
     }
 
     return null;
@@ -766,6 +847,7 @@ const constructApiUponUserInput = async (apiTemplate: any, userInput: string) =>
             ]
         });
 
+        console.log(response.usage?.completion_tokens)
         if (!response || !response.choices || response.choices.length === 0) {
             const output = {
                 success: false,
@@ -815,6 +897,24 @@ function buildUrl(endpoint: string, queryParams: Object): string {
   return url.toString();
 }
 
+// Extract endpoint and query params from apiConfig in a tolerant way
+function extractApiRequest(apiConfig: any): { endpoint: string; queryParams?: Object } | null {
+    if (!apiConfig) return null;
+    const endpoint = apiConfig?.apiRequest?.endpoint || apiConfig?.endpoint || "";
+    const queryParams = apiConfig?.apiRequest?.queryParams || apiConfig?.queryParams || {};
+    return { endpoint, queryParams };
+}
+
+// Invoke API and summarize without requiring user input
+async function invokeApiAndSummarize(apiConfig: any, titleFallback: string): Promise<string> {
+    const info = extractApiRequest(apiConfig);
+    if (!info || !info.endpoint) throw new Error("Invalid API configuration");
+    const url = buildUrl(info.endpoint, info.queryParams || {});
+    const apiData = await callingConstructApiUponUserInput(url);
+    const message = await generatingResponseFromApiResult(titleFallback || "API Node Response", apiData);
+    return message as string;
+}
+
 const callingConstructApiUponUserInput = async (apiEndpoint : string) => {
     try{
         const response = await fetch(apiEndpoint);
@@ -840,9 +940,8 @@ export const generatingResponseFromApiResult = async(input : string, apiResponse
             };
         }
 
-
         const openai = new OpenAI({
-            apiKey: process.env.API_FOR_API_CONSTRUCTOR,
+            apiKey: process.env.API_KEY_FOR_API_CALLING_IN_CONTROLLED_BOT,
             baseURL: "https://api.groq.com/openai/v1",
         });
 
@@ -853,7 +952,7 @@ export const generatingResponseFromApiResult = async(input : string, apiResponse
                 { role: "user", content: `User Input: ${input}\nAPI Response Data: ${JSON.stringify(apiResponseData)}` }
             ]
         });
-
+        console.log(response.usage?.completion_tokens)
 
         if (!response || !response.choices || response.choices.length === 0) {
             return {
@@ -870,11 +969,9 @@ export const generatingResponseFromApiResult = async(input : string, apiResponse
         }
 
         let result = message.content;
-        console.log("Generated Response from API Data : ", result);
         return result;
     }
     catch(e){
-
         throw e;
     }
 
