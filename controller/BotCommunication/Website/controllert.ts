@@ -579,6 +579,7 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                 }
 
                 else if(nextNodeDataFromRedis?.executor === 'api') {
+                    return res.status(200).json({ message: "API executor node reached. Further implementation required." });
                     // API executor - implementation left empty as requested
                 }
 
@@ -711,3 +712,26 @@ const cacheNodeByType = async (
 
     return null;
 };
+
+const constructApiUponUserInput = (apiTemplate : any, userInput : string) =>{
+    try{
+        if(!apiTemplate || !userInput){
+            return null;
+        }
+        const endpoint = apiTemplate.endpoint;
+        const method = apiTemplate.method || "GET";
+        const queryParamsTemplate = apiTemplate.queryParameter || {};
+
+        const openai = new OpenAI({
+            apiKey: process.env.API_CONSTRUCTOR_API_KEY,
+            baseURL: "https://api.groq.com/openai/v1",
+        });
+
+        
+
+    }   
+
+    catch(e){
+         
+    }
+}
