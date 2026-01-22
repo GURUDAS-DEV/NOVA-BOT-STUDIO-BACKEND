@@ -11,85 +11,139 @@ import { ControlledBotModel } from "../../../Models/ControlledBotSchema.js";
 import { ControlledBotNodeModel } from "../../../Models/ControlledBotNodes.js";
 import { ControlledBotEdgeModel } from "../../../Models/ControlledBotEdges.js";
 
-export const analyticsInsertionHelper = async(botId : any, apiHashKey : string, model : string, latency : number, tokenIn : number, tokenOut : number, totalToken : number, eventType : string) : Promise<void> => {
-    try{
+//----------------------------------------------------------------------------------------------------------------//
+//----------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------Helper and miscellaneous functions -------------------------------------//
+//----------------------------------------------------------------------------------------------------------------//
+//----------------------------------------------------------------------------------------------------------------//
+const redis = getRedisClient();
+
+// Interfaces for Controlled Bot Flow
+interface ControlledBotDetail {
+    name: string;
+    status: string;
+    platform: string;
+    entryNodeId: mongoose.Types.ObjectId;
+}
+
+interface FormattedOption {
+    optionId: mongoose.Types.ObjectId;
+    intent: string;
+    toNodeId: mongoose.Types.ObjectId;
+    order: number;
+}
+
+interface NodeWithOptions {
+    currentNode: any;
+    options: FormattedOption[];
+}
+
+interface SessionDetail {
+    currentNodeId: string;
+    previousNodeId: string | null;
+}
+
+const getFromRedisStringOnly = async (redisKey: string): Promise<any> => {
+    try {
+        const data = await redis.get(redisKey);
+        if (data) {
+            return typeof data === 'string' ? JSON.parse(data) : data;
+        }
+        return null;
+    }
+    catch (e) {
+        console.error("Error in getFromRedisStringOnly:", e);
+        return null;
+    }
+};
+
+//----------------------------------------------------------------------------------------------------------------//
+//----------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------Helper Functions ends here---------------------------------------------//
+//----------------------------------------------------------------------------------------------------------------//
+//----------------------------------------------------------------------------------------------------------------//
+
+
+
+export const analyticsInsertionHelper = async (botId: any, apiHashKey: string, model: string, latency: number, tokenIn: number, tokenOut: number, totalToken: number, eventType: string): Promise<void> => {
+    try {
 
         const insertingAnalytics = BotAnalyticsModel.insertOne({
             botId,
             apiHashKey,
-            timestamp : new Date(),
+            timestamp: new Date(),
             eventType,
-            usage : {
+            usage: {
                 model,
-                tokenIn : tokenIn,
-                tokenOut : tokenOut,
-                totalToken : totalToken,
+                tokenIn: tokenIn,
+                tokenOut: tokenOut,
+                totalToken: totalToken,
             },
-            performance : {
-                latency : latency,
+            performance: {
+                latency: latency,
             },
-            context : {
-                plan : "free",
-                region : "us-east-1",
+            context: {
+                plan: "free",
+                region: "us-east-1",
             }
         });
-        if(!insertingAnalytics){
+        if (!insertingAnalytics) {
             console.error("Failed to insert bot analytics");
             return;
         }
         console.log("Bot analytics inserted successfully");
     }
-    catch(e){
+    catch (e) {
         console.error("Error in analticsInsertionHelper:", e);
     }
 
 }
 
-export const freestyleWebsiteBotController = async(req : Request, res : Response) : Promise<Response> =>{
-    try{    
+export const freestyleWebsiteBotController = async (req: Request, res: Response): Promise<Response> => {
+    try {
         const botId = (req as any).botId;
         const { clientId } = req.cookies;
-        const {userMessage} = req.body;
+        const { userMessage } = req.body;
         let apiKey = req.headers['authorization']?.split(' ')[1];
-        if(apiKey){
+        if (apiKey) {
             apiKey = crypto.createHash('sha256').update(apiKey).digest('hex');
         }
 
-        if(!botId || !userMessage){
-            return res.status(400).json({ message : "Bot ID and userMessage are required."});
+        if (!botId || !userMessage) {
+            return res.status(400).json({ message: "Bot ID and userMessage are required." });
         }
 
-        const redis = getRedisClient();
-        const botDetails = await redis.get(`WebsiteBotDetails:${botId}`);
+
+        const botDetails = await getFromRedisStringOnly(`WebsiteBotDetails:${botId}`);
         let botStatus = null, botConfig = null, botName = "CuteBot";
 
-        if(botDetails){
+        if (botDetails) {
             // Check if botDetails is already an object (some Redis clients auto-parse JSON)
             const parsedDetails = typeof botDetails === 'string' ? JSON.parse(botDetails) : botDetails;
             botStatus = { status: parsedDetails.status };
             botConfig = { config: parsedDetails.config };
             botName = parsedDetails.botName || "CuteBot";
         }
-        else{
+        else {
             botStatus = await BotStructureModel.findOne({ _id: botId, platform: 'Website' });
-            if(!botStatus){
-                return res.status(404).json({ message : "Bot not found."});
+            if (!botStatus) {
+                return res.status(404).json({ message: "Bot not found." });
             }
 
             botConfig = await botConfiguration.findOne({ botId: botId });
-            if(!botConfig){
-                return res.status(404).json({ message : "Bot configuration not found."});
+            if (!botConfig) {
+                return res.status(404).json({ message: "Bot configuration not found." });
             }
 
             await redis.set(`WebsiteBotDetails:${botId}`, JSON.stringify({
-                status : botStatus.status,
-                botName : botStatus.botName,
-                config : botConfig.config,
+                status: botStatus.status,
+                botName: botStatus.botName,
+                config: botConfig.config,
             }), { ex: 1800 }); //cache for 30 minutes
         };
 
-        if(botStatus.status !== 'active'){
-            return res.status(403).json({ message : "Bot is not active."});
+        if (botStatus.status !== 'active') {
+            return res.status(403).json({ message: "Bot is not active." });
         }
 
         const config = botConfig?.config || {};
@@ -123,18 +177,18 @@ Bot: ${example.answer || ""}`)
 
         const systemPrompt = freeStyleWebsiteBotPrompt({
             botName: botName || "SampleBot",
-            botType : config.botType || "General Purpose",
-            tone : config.tone || "Friendly",
-            verbosity : config.verbosity || "Concise",
-            websiteType : config.websiteType || "E-commerce",
-            description : config.behaviorDescription || "A helpful website assistant bot.",
-            ownerInformation : config.OwnerInformation || "No owner information provided.",
-            AdditionalInformation : config.additionalInformation || "No additional information provided.",
-            examples : examplesText,
-            apiIntegration : hasApiIntegration,
-            apiEndpoint : config.apiEndpoint || "",
-            apiResponseFormat : config.responseFormat || "",
-            apiUsageRule : config.apiUsageRules || "",
+            botType: config.botType || "General Purpose",
+            tone: config.tone || "Friendly",
+            verbosity: config.verbosity || "Concise",
+            websiteType: config.websiteType || "E-commerce",
+            description: config.behaviorDescription || "A helpful website assistant bot.",
+            ownerInformation: config.OwnerInformation || "No owner information provided.",
+            AdditionalInformation: config.additionalInformation || "No additional information provided.",
+            examples: examplesText,
+            apiIntegration: hasApiIntegration,
+            apiEndpoint: config.apiEndpoint || "",
+            apiResponseFormat: config.responseFormat || "",
+            apiUsageRule: config.apiUsageRules || "",
         });
 
         const openai = new OpenAI({
@@ -147,19 +201,19 @@ Bot: ${example.answer || ""}`)
         let lastMessages = [];
         const redisKey = `WebsiteBotChatHistory:${botId}:${newClientId}`;
 
-        if(!clientId){
+        if (!clientId) {
             const generatedId = crypto.randomUUID();
             newClientId = generatedId;
             res.cookie('clientId', generatedId, {
-                maxAge : 60*60*1000,
+                maxAge: 60 * 60 * 1000,
             });
         }
-        else{
+        else {
             // Limit to last 4 messages (2 turns) to reduce token usage
             const storedMessages = await redis.lrange(redisKey, -4, -1);
 
-            if(storedMessages && storedMessages.length > 0){
-                lastMessages = storedMessages.map(msg => typeof msg === 'string' ? JSON.parse(msg) : msg);  
+            if (storedMessages && storedMessages.length > 0) {
+                lastMessages = storedMessages.map(msg => typeof msg === 'string' ? JSON.parse(msg) : msg);
             }
         }
 
@@ -175,9 +229,9 @@ Bot: ${example.answer || ""}`)
         let finalResponse = "";
         let iterations = 0;
         const maxIterations = 5; // Prevent infinite loops
-        let tokenIn : number = 0;
-        let tokenOut : number = 0;
-        let totalToken : number = 0;
+        let tokenIn: number = 0;
+        let tokenOut: number = 0;
+        let totalToken: number = 0;
         let latency = new Date().getTime();
 
         while (iterations < maxIterations) {
@@ -193,15 +247,15 @@ Bot: ${example.answer || ""}`)
             }
 
             const response = await openai.chat.completions.create(requestParams);
-            tokenIn =  response.usage?.prompt_tokens === undefined ? 0 : tokenIn + response.usage?.prompt_tokens|| 0;
-            tokenOut = response.usage?.completion_tokens === undefined ? 0 : tokenOut + response.usage?.completion_tokens|| 0;
+            tokenIn = response.usage?.prompt_tokens === undefined ? 0 : tokenIn + response.usage?.prompt_tokens || 0;
+            tokenOut = response.usage?.completion_tokens === undefined ? 0 : tokenOut + response.usage?.completion_tokens || 0;
             totalToken = tokenIn + tokenOut;
 
             if (!response?.choices?.length) {
                 return res.status(500).json({ error: "Failed to get response from OpenAI" });
             }
 
-            const message = response.choices[0] === undefined  ? {content : "Something went Wrong!"} : response.choices[0].message;
+            const message = response.choices[0] === undefined ? { content: "Something went Wrong!" } : response.choices[0].message;
 
             if ((message as any).tool_calls && (message as any).tool_calls.length > 0) {
                 messages.push({
@@ -273,7 +327,7 @@ Bot: ${example.answer || ""}`)
             }
         }
 
-        
+
 
         if (!finalResponse) {
             return res.status(500).json({ error: "Failed to get final response from LLM" });
@@ -281,7 +335,7 @@ Bot: ${example.answer || ""}`)
 
         // Update chat history in Redis
         const lastMessageLenght = lastMessages.length;
-        if(lastMessageLenght >= 4){
+        if (lastMessageLenght >= 4) {
             // Keep only last 4 messages (2 conversation turns)
             await redis.ltrim(redisKey, -3, -1);
         }
@@ -291,13 +345,13 @@ Bot: ${example.answer || ""}`)
         latency = new Date().getTime() - latency;
 
         // Insert analytics
-        (async()=>{
+        (async () => {
             await analyticsInsertionHelper(botId, apiKey || "NOT_FOUND", "openai/gpt-oss-safeguard-20b", latency, tokenIn, tokenOut, totalToken, "request");
         })()
 
         return res.status(200).json({ message: finalResponse });
     }
-    catch(e){
+    catch (e) {
         console.error("Error in freestyleWebsiteBotController:", e);
         return res.status(500).json({ message: "Internal server error" });
     }
@@ -305,70 +359,355 @@ Bot: ${example.answer || ""}`)
 
 
 
-export const controlledStyleWebsiteBotController = async(req : Request, res : Response) : Promise<Response> =>{
-    try{
-        //getting and validating data of bot.
+export const controlledStyleWebsiteBotController = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        // Validate and get bot ID
         const { botId } = req.body;
-        if(!botId){
-            return res.status(400).json({ message : "Bot ID is required."});
+        if (!botId) {
+            return res.status(400).json({ message: "Bot ID is required." });
         }
 
+        // Handle session ID - create or retrieve
         let { sessionId } = req.cookies;
-        if(!sessionId){
-            const generatedId = crypto.randomUUID();
-            sessionId = generatedId;
-            res.cookie('sessionId', generatedId, {
-                maxAge : 60*60*1000,//1 hour
+        if (!sessionId) {
+            sessionId = crypto.randomUUID();
+            res.cookie('sessionId', sessionId, {
+                maxAge: 60 * 60 * 1000, // 1 hour
             });
-        };
-        //until here we gets and validate bot data.
-
-        //creating bot details and session details redis keys for fetching first node of data from either redis or db.
-        const redis = getRedisClient();
-        const redisKeyForBot = `controlledWebsiteBotFirstNode:${botId}`;
-        const sessionalRedisKey = `controlledWebsiteBotSessionDetail:${botId}:${sessionId}`;
-        
-        //Finding bot details from redis, if not found then from db and storing it in redis for next time use.
-        let botDetails = await redis.get(redisKeyForBot);
-        if(!botDetails){
-            const botDBDetails = await ControlledBotModel.findById(botId);
-            if(!botDBDetails){
-                return res.status(404).json({ message : "Bot not found or deleted by owner."});//0.01% chance of hiting this thing.
-            }
-            botDetails = {
-                name : botDBDetails.name,
-                status : botDBDetails.status,
-                platform : botDBDetails.platform,
-                entryNodeId : botDBDetails.entryNodeId,
-            };
-
-            if(!botDetails ||  botDBDetails.status !== 'active'){
-                return res.status(403).json({ message : "Bot is not active."});
-            };
-
-            await redis.set(redisKeyForBot, JSON.stringify(botDetails), { ex: 3600 });//set for 1 hr. 
         }
-        else{
+
+        // Setup Redis keys
+        const redisKeyForBot = `controlledBotFirstNode:${botId}`;
+        const sessionalRedisKey = `controlledBotSessionDetail:${botId}:${sessionId}`;
+        const redisKeyForNodes = (nodeId: string) => `controlledBotNodes:${botId}:${nodeId}`;
+
+        // Fetch and validate bot details
+        let botDetails: ControlledBotDetail | null = await getFromRedisStringOnly(redisKeyForBot);
+        if (!botDetails) {
+            const botDBDetails = await ControlledBotModel.findById(botId);
+            if (!botDBDetails) {
+                return res.status(404).json({ message: "Bot not found or deleted by owner." });
+            }
+
+            if (botDBDetails.status !== 'active') {
+                return res.status(403).json({ message: "Bot is not active." });
+            }
+ 
+            botDetails = {
+                name: botDBDetails.name,
+                status: botDBDetails.status,
+                platform: botDBDetails.platform,
+                entryNodeId: botDBDetails.entryNodeId,
+            };
+
+            await redis.set(redisKeyForBot, JSON.stringify(botDetails), { ex: 86400 });
+        } else {
             botDetails = typeof botDetails === 'string' ? JSON.parse(botDetails) : botDetails;
         }
 
-        //finding the ongoing session to retrive where user left (from redis), if not found(means user is requesting for first time or redis has lost the data),then creating new session. 
-        const sessionalBotDetails = await redis.get(sessionalRedisKey);
-        if(!sessionalBotDetails){
-            const initialNodeDetails = await ControlledBotNodeModel.findOne({ botId : botId, _id : (botDetails as any).entryNodeId})
-            if(!initialNodeDetails){
-                return res.status(500).json({ message : "Bot configuration error. Please contact bot owner."});
+        // Check for existing session
+        const sessionalBotDetails = await getFromRedisStringOnly(sessionalRedisKey);
+
+        // New session - start from initial node
+        if (!sessionalBotDetails) {
+            const initialNodeId = botDetails?.entryNodeId;
+            if (!initialNodeId) {
+                return res.status(500).json({ message: "Bot entry node is not Found. Contact bot owner. Thanks for using us." });
             }
 
-            const optionsForIntialNode = await ControlledBotEdgeModel.find({ fromNodeId : initialNodeDetails._id});
-            console.log("Initial Node Options:", optionsForIntialNode);
+            // Try to get initial node from Redis
+            const initialNodeDataFromRedis = await getFromRedisStringOnly(redisKeyForNodes(initialNodeId.toString()));
+
+            if (!initialNodeDataFromRedis) {
+                // Fetch from database
+                const initialNodeFromDb = await ControlledBotNodeModel.findOne({ _id: initialNodeId, botId: botId });
+                if (!initialNodeFromDb) {
+                    return res.status(500).json({ message: "Bot entry node data is corrupted or not found. Contact bot owner. Thanks for using us." });
+                }
+
+                // Handle initial node based on executor type
+                return await processInitialNode(initialNodeFromDb, initialNodeId.toString(), botId, redisKeyForNodes, sessionalRedisKey, res);
+            } else {
+                // Found in Redis - process and return
+                return await processInitialNodeFromRedis(initialNodeDataFromRedis, initialNodeId.toString(), redisKeyForNodes, sessionalRedisKey, sessionId, res);
+            }
+        } else {
+            // Existing session - continue from current node
+            const { input } = req.body;
+            const sessionCurrentNodeId = (sessionalBotDetails as any)?.currentNodeId;
+
+            if (!sessionCurrentNodeId) {
+                return res.status(500).json({ message: "Session data is corrupted. Please start a new session." });
+            }
+
+            let currentNodeDataFromRedis = await getFromRedisStringOnly(redisKeyForNodes(sessionCurrentNodeId));
+            if (!currentNodeDataFromRedis) {
+                const currentNodeDataFromDb = await ControlledBotNodeModel.findOne({ _id: sessionCurrentNodeId, botId: botId });
+                if (!currentNodeDataFromDb) {
+                    return res.status(500).json({ message: "Current node data not found. Please start a new session." });
+                }
+
+                // Cache the node based on type
+                currentNodeDataFromRedis = await cacheNodeByType(currentNodeDataFromDb, sessionCurrentNodeId, botId, redisKeyForNodes);
+            }
+
+            const currentNodeData = currentNodeDataFromRedis?.currentNode;
+            if (!currentNodeData) {
+                return res.status(500).json({ message: "Current node data is corrupted. Please start a new session." });
+            }
+
+            
+            // Process options node
+            if (currentNodeData.executor === 'none' && currentNodeData.output?.mode === 'options') {
+                console.log("Current Node is Options Node, processing user input:", input);
+                const currentNodeOptions = currentNodeDataFromRedis.options as FormattedOption[];
+                const nextNodeId = currentNodeOptions.find((option) => option.intent === input || String(option.optionId) === input)?.toNodeId;
+
+
+                if (!nextNodeId) {
+                    return res.status(400).json({ message: "Invalid option selected. Please select a valid option." });
+                }
+
+                let nextNodeDataFromRedis = await getFromRedisStringOnly(redisKeyForNodes(nextNodeId.toString()));
+                
+                if (!nextNodeDataFromRedis) {
+                    const nextNodeDataFromDb = await ControlledBotNodeModel.findOne({ _id: nextNodeId, botId: botId });
+                    if (!nextNodeDataFromDb) {
+                        return res.status(500).json({ message: "Next node data not found. Please start a new session." });
+                    }
+
+                    // Cache the next node
+                    nextNodeDataFromRedis = await cacheNodeByType(nextNodeDataFromDb, nextNodeId.toString(), botId, redisKeyForNodes);
+                }
+                
+                nextNodeDataFromRedis = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
+                // Return next nodex
+                if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
+                    console.log("Next Node is Options Node.");
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "options", nodeData: nextNodeDataFromRedis });
+                }
+                else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis  });
+                }
+                else if (nextNodeDataFromRedis?.executor === 'input') {
+                    
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis });
+                }
+                else if (nextNodeDataFromRedis?.currentNode?.executor === 'api') {
+                    // API executor - implementation left empty as requested
+                }
+            }
+            else if(currentNodeData.executor === 'none' && currentNodeData.output?.mode === 'text') {
+                console.log("Current Node is Text Node, processing user input:", input);
+                const nextNodeId = currentNodeData.output?.nextNodeId;
+                if(!nextNodeId){
+                    return res.status(500).json({ message: "Next node ID is not configured properly. Contact bot owner. Thanks for using us." });
+                }
+
+                let nextNodeDataFromRedis = await getFromRedisStringOnly(redisKeyForNodes(nextNodeId.toString()));
+                if(!nextNodeDataFromRedis) {
+                    const nextNodeDataFromDb = await ControlledBotNodeModel.findOne({ _id: nextNodeId, botId: botId });
+                    if (!nextNodeDataFromDb) {
+                        return res.status(500).json({ message: "Next node data not found. Please start a new session." });
+                    }
+                    // Cache the next node
+                    nextNodeDataFromRedis = await cacheNodeByType(nextNodeDataFromDb, nextNodeId.toString(), botId, redisKeyForNodes);
+                    nextNodeDataFromRedis = nextNodeDataFromDb;
+                };
+                nextNodeDataFromRedis = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
+
+                // Return next node
+                if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
+                    console.log("Next Node is Options Node.");
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "options", nodeData: nextNodeDataFromRedis });
+                }
+                else if(nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis  });
+                }
+                else if(nextNodeDataFromRedis?.executor === 'input') {
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis });
+                }
+                else if(nextNodeDataFromRedis?.executor === 'api') {
+                    // API executor - implementation left empty as requested
+                }
+            }
+            else if(currentNodeData.executor === 'input') {
+                console.log("Current Node  : ", currentNodeData);
+                if (!input) {
+                    return res.status(400).json({ message: "A Valid Input is required for this node." });
+                }
+                const nextNodeId = currentNodeData.inputConfig?.nextNodeId;
+                if(!nextNodeId){
+                    return res.status(500).json({ message: "Next node ID is not configured properly. Contact bot owner. Thanks for using us." });
+                }
+                // Fetch next node based on input
+                let nextNodeDataFromRedis = await getFromRedisStringOnly(redisKeyForNodes(nextNodeId.toString()));
+                if(!nextNodeDataFromRedis) {
+                    const nextNodeDataFromDb = await ControlledBotNodeModel.findOne({ _id: nextNodeId, botId: botId });
+                    if (!nextNodeDataFromDb) {
+                        return res.status(500).json({ message: "Next node data not found. Please start a new session." });
+                    }
+
+                    // Cache the next node
+                    nextNodeDataFromRedis = await cacheNodeByType(nextNodeDataFromDb, nextNodeId.toString(), botId, redisKeyForNodes);
+                    nextNodeDataFromRedis = nextNodeDataFromDb;
+                };
+
+                nextNodeDataFromRedis = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
+
+                // Return next node
+                if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
+                    console.log("Next Node is Options Node.");
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "options", nodeData: nextNodeDataFromRedis });
+                }
+
+                else if(nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis  });
+                }
+
+                else if(nextNodeDataFromRedis?.executor === 'input') {
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis });
+                }
+
+                else if(nextNodeDataFromRedis?.executor === 'api') {
+                    // API executor - implementation left empty as requested
+                }
+
+                return res.status(200).json({ message: "Current node expects user input. Please provide the required input." });
+            }
+            else if(currentNodeData.executor === 'api'){
+
+            }
+
         }
 
-
-        return res.status(200).json({ message: "Controlled Style Website Bot Controller - To be implemented." });
-    }
-    catch(e){
+        return res.status(200).json({ message: "Controlled Style Website Bot Controller" });
+    } catch (e) {
         console.error("Error in controlledStyleWebsiteBotController:", e);
         return res.status(500).json({ message: "Internal server error" });
     }
-}
+};
+
+// Helper to process initial node from database
+const processInitialNode = async (
+    nodeData: any,
+    nodeId: string,
+    botId: string,
+    redisKeyForNodes: (id: string) => string,
+    sessionalRedisKey: string,
+    res: Response
+): Promise<Response> => {
+    if (nodeData.executor === 'none' && nodeData.output?.mode === 'options') {
+        const optionsFromDb = await ControlledBotEdgeModel.find({ fromNodeId: nodeData._id }).sort({ order: 1 });
+        if (!optionsFromDb || optionsFromDb.length === 0) {
+            return res.status(500).json({ message: "Bot options are not configured properly. Contact bot owner. Thanks for using us." });
+        }
+
+        const formattedOptions: FormattedOption[] = optionsFromDb.map((option) => ({
+            optionId: option._id,
+            intent: option.intent,
+            toNodeId: option.toNodeId,
+            order: option.order,
+        }));
+
+        const nodeWithOptions: NodeWithOptions = {
+            currentNode: nodeData,
+            options: formattedOptions,
+        };
+
+        await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeWithOptions), { ex: 86400 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+
+        return res.status(200).json({ type: "options", nodeData: nodeWithOptions });
+    } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
+        await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeData), { ex: 86400 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+
+        return res.status(200).json({ type: "text", nodeData });
+    } else if (nodeData.executor === 'input') {
+        await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeData), { ex: 86400 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+
+        return res.status(200).json({ type: "input", nodeData });
+    } else if (nodeData.executor === 'api') {
+        // API executor - implementation left empty as requested
+    }
+
+    return res.status(500).json({ message: "Node type not recognized." });
+};
+
+// Helper to process initial node from Redis
+const processInitialNodeFromRedis = async (
+    nodeDataFromRedis: any,
+    nodeId: string,
+    redisKeyForNodes: (id: string) => string,
+    sessionalRedisKey: string,
+    sessionId: string,
+    res: Response
+): Promise<Response> => {
+    const nodeData = nodeDataFromRedis.currentNode || nodeDataFromRedis;
+
+    if (nodeData.executor === 'none' && nodeData.output?.mode === 'options') {
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        return res.status(200).json({ type: "options", nodeData: nodeDataFromRedis });
+    } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        return res.status(200).json({ type: "text", nodeData });
+    } else if (nodeData.executor === 'input') {
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        return res.status(200).json({ type: "input", nodeData });
+    } else if (nodeData.executor === 'api') {
+        // API executor - implementation left empty as requested
+    }
+
+    return res.status(500).json({ message: "Node type not recognized." });
+};
+
+// Helper to cache node based on its type
+const cacheNodeByType = async (
+    nodeData: any,
+    nodeId: string,
+    botId: string,
+    redisKeyForNodes: (id: string) => string
+): Promise<any> => {
+    if (nodeData.executor === 'none' && nodeData.output?.mode === 'options') {
+        const optionsFromDb = await ControlledBotEdgeModel.find({ fromNodeId: nodeData._id }).sort({ order: 1 });
+        if (!optionsFromDb || optionsFromDb.length === 0) {
+            return null;
+        }
+
+        const formattedOptions: FormattedOption[] = optionsFromDb.map((option) => ({
+            optionId: option._id,
+            intent: option.intent,
+            toNodeId: option.toNodeId,
+            order: option.order,
+        }));
+
+        const nodeWithOptions: NodeWithOptions = {
+            currentNode: nodeData,
+            options: formattedOptions,
+        };
+
+        await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeWithOptions), { ex: 86400 });
+        return nodeWithOptions;
+    } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
+        await redis.set(redisKeyForNodes(nodeId), JSON.stringify({currentNode : nodeData}), { ex: 86400 });
+        return { currentNode: nodeData };
+    } else if (nodeData.executor === 'input') {
+        await redis.set(redisKeyForNodes(nodeId), JSON.stringify({currentNode: nodeData}), { ex: 86400 });
+        return { currentNode: nodeData };
+    } else if (nodeData.executor === 'api') {
+        // API executor - implementation left empty as requested
+    }
+
+    return null;
+};

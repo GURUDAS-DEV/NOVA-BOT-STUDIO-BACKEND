@@ -5,6 +5,7 @@ import { generateAPIKey } from "../../utils/helper/APIKeyGenerator.js";
 import { hashApiKey } from "../../utils/helper/APIKeyHashing.js";
 import { getRedisClient } from "../../Redis/connect.js";
 import { ControlledBotModel } from "../../Models/ControlledBotSchema.js";
+import { pipeline } from "stream";
 
 
 export const APIKeyForWebsiteController = async(req : Request, res : Response) : Promise<Response> => {
@@ -14,11 +15,44 @@ export const APIKeyForWebsiteController = async(req : Request, res : Response) :
             return res.status(400).json({ message : "User ID is required."});
         }
 
-        const websiteBots = await BotStructureModel.find({
-            userId,
-            platform: 'Website',
-            status: { $nin: ['deleted', 'draft'] }
-        });
+        const freeStyleBots = BotStructureModel.collection.name;
+
+
+        const pipeline : any[] = [
+            { $match: { userId, status : { $nin: ['deleted', 'draft'] } } },
+            {
+                $project: {
+                    _id : 1,
+                    platform : "$platform",
+                    name : "$name",
+                    status : 1,
+                    style : 1,
+                    createdAt : 1,
+                },
+            },
+            {
+                $unionWith : {
+                    coll : freeStyleBots,
+                    pipeline : [
+                        { $match: { userId, status : { $nin: ['deleted', 'draft'] } } },
+                        {
+                            $project : {
+                                _id : 1, 
+                                platform : "$platform",
+                                name : "$botName",
+                                status : 1,
+                                style : 1,
+                                createdAt : "$created_at",
+                            },
+                        },
+                    ],
+                },
+            },
+        ];
+        pipeline.push({ $sort : { createdAt : -1 } });
+
+        const websiteBots = await ControlledBotModel.aggregate(pipeline);
+
         if(!websiteBots || websiteBots.length === 0){
             return res.status(404).json({ message : "No website bots found for this user."});
         }
@@ -27,7 +61,6 @@ export const APIKeyForWebsiteController = async(req : Request, res : Response) :
         return res.status(200).json({message : "Bot list fetched successfully", bots : websiteBots});
     }
     catch(error){
-        console.error("Error in APIKeyForWebsiteController:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
 }
@@ -49,7 +82,6 @@ export const GenerateNewApiKeyForWebsiteController = async(req : Request, res : 
                 return res.status(404).json({ message : "Bot not found."});
         }
 
-        console.log(botId);
         const {data , error} = await supabase.from('API_KEY').update({ isRevoked : true }).eq('botId', botId).eq('isRevoked', false).select("HashedApiKey");
 
         const redis = getRedisClient();
@@ -57,7 +89,6 @@ export const GenerateNewApiKeyForWebsiteController = async(req : Request, res : 
             await redis.del(`apiKey:${(data[0] as any).HashedApiKey}`); //delete cached api key if exists
         }
 
-        console.log(data);
         if(error)
             return res.status(500).json({ message: "Failed to revoke existing API keys." });
 
