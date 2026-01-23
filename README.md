@@ -57,51 +57,6 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ---  
 
-## Architecture  
-
-```
-/
-├─ Database/                # PostgreSQL & MongoDB init helpers
-├─ Redis/                   # Redis client singleton (used by API‑key & website‑bot layers)
-├─ Email/                   # HTML email templates
-├─ Middleware/              # auth & access guards
-├─ Models/                  # Mongoose schemas & TypeORM entities
-│   ├─ BotAnalytics.ts
-│   └─ (other models)
-├─ Router/                  # Feature‑specific routers (mounted under /api/)
-│   ├─ Authentication/
-│   ├─ API_Key_Management/
-│   ├─ Bot_Management/
-│   ├─ Bot_Configration/
-│   ├─ AI_Feature_Management/
-│   ├─ Advance_Bot_Management/
-│   ├─ BotAnalytics/
-│   ├─ CommunicationWithBot/
-│   │   └─ Website/
-│   └─ Testing/
-├─ controller/              # Business logic per feature
-│   ├─ authentication/
-│   ├─ AI_Feature_Management/
-│   ├─ API_Key_Management/
-│   ├─ AdvanceBotManagement/
-│   ├─ BotAnalyticsManagement/
-│   ├─ BotConfigrationController/
-│   ├─ Bot_Management/
-│   └─ Testing/
-├─ utils/                   # Helpers (JWT, validation, system‑prompt utils, etc.)
-├─ Static/                  # Assets (logo, etc.)
-├─ index.ts                 # Server bootstrap (CORS, parsers, DB/Redis init, router registration)
-└─ .env.example             # Template for environment variables
-```
-
-* **Entry point (`index.ts`)** – sets up CORS, cookie parser, JSON body parsing, initializes databases, connects Redis, registers routers, and starts the HTTP server.  
-* **Routers** – each feature lives in its own router file, mounted under a versioned `/api/` namespace.  
-* **Controllers** – thin layers that orchestrate service calls, keeping routers declarative.  
-* **Middleware** – protects routes (`accessMiddleware`, `authMiddleware`).  
-* **Redis** – powers both API‑key caching *and* the real‑time website‑bot communication channel.  
-
----  
-
 ## Getting Started  
 
 ### Prerequisites  
@@ -132,8 +87,8 @@ cp .env.example .env
 
 #### Database setup  
 
-*PostgreSQL* – run any required migrations (if you add them) or let the app create tables on first launch.  
-*MongoDB* – ensure the database exists; the app will create collections automatically.  
+* **PostgreSQL** – run any required migrations (if you add them) or let the app create tables on first launch.  
+* **MongoDB** – ensure the database exists; the app will create collections automatically.  
 
 #### Run locally (development)  
 
@@ -365,4 +320,45 @@ CMD ["node", "dist/index.js"]
 Build & run:
 
 ```bash
-docker build
+docker build -t nova-bot-studio-backend .
+docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
+```
+
+---  
+
+## Contributing  
+
+1. **Fork the repository**  
+2. **Create a feature branch** (`git checkout -b feat/awesome-feature`)  
+3. **Commit your changes** (`git commit -m "feat: add awesome feature"`)  
+4. **Push to your fork** (`git push origin feat/awesome-feature`)  
+5. **Open a Pull Request**  
+
+### Development workflow  
+
+* Run `npm run lint` and `npm run format` before committing.  
+* Ensure all tests pass (`npm test`).  
+* Keep the PR focused on a single concern.  
+
+### Code style  
+
+* Use **Prettier** formatting (already configured).  
+* Follow the existing folder structure (`controller/`, `router/`, `utils/`, etc.).  
+* Write TypeScript with strict typing (`tsconfig.json` enforces `strict` mode).  
+
+---  
+
+## License & Credits  
+
+This project is licensed under the **MIT License** – see the [LICENSE](LICENSE) file for details.  
+
+**Contributors**  
+
+- GURUDAS‑DEV (owner)  
+- Open‑source community contributors (via pull requests)  
+
+**Acknowledgments**  
+
+- Express, TypeScript, PostgreSQL, MongoDB, Redis, Jest, Supertest, Docker, and all npm packages listed in `package.json`.  
+
+---  
