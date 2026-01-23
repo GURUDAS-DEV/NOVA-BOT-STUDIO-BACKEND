@@ -789,7 +789,7 @@ export const handleGitHubAuthentication = async (req: Request, res: Response): P
         }
         const emails = await emailsRes.json();
         console.log("GitHub Emails:", emails);
-        const primaryEmail = emails.find(e => e.primary && e.verified)?.email;
+        const primaryEmail = emails.find((e: any) => e.primary && e.verified)?.email;
         
 
         const { data: user, error: userError } = await supabase.from("users").select("*").eq("email", primaryEmail).maybeSingle();
