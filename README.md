@@ -57,6 +57,47 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ---  
 
+## Architecture  
+
+```
+src/
+├─ controller/            # Request handlers (business logic)
+│   ├─ authentication/
+│   ├─ API_Key_Management/
+│   ├─ Bot_Management/
+│   ├─ Bot_Configration/
+│   ├─ AI_Feature_Management/
+│   ├─ AdvanceBotManagement/
+│   ├─ BotAnalyticsManagement/
+│   └─ Testing/
+├─ Router/                # Express routers – one per domain
+│   ├─ Authentication/
+│   ├─ API_Key_Management/
+│   ├─ Bot_Management/
+│   ├─ Bot_Configration/
+│   ├─ AI_Feature_Management/
+│   ├─ Advance_Bot_Management/
+│   ├─ BotAnalytics/
+│   └─ Testing/
+├─ Models/                # Mongoose / TypeORM schemas
+├─ utils/
+│   ├─ JWT/               # Token generation & validation
+│   ├─ System_Prompt/     # Prompt‑related helpers
+│   ├─ helper/            # Miscellaneous utilities (API‑key, sanitising, etc.)
+│   └─ types/             # Shared TypeScript types
+├─ Database/              # DB connection wrappers (PostgreSQL & MongoDB)
+├─ Redis/                 # Redis client singleton
+├─ Middleware/            # Auth & access control middlewares
+├─ Static/                # Assets (logo, etc.)
+└─ index.ts               # Application entry point
+```
+
+* **Express** routes delegate to controllers, which interact with the data layer (PostgreSQL, MongoDB) and auxiliary services (Redis, JWT).  
+* **Redis** is used as a fast cache for API‑key look‑ups, session storage, and real‑time bot messaging.  
+* **JWT** tokens are signed with separate secrets for access and refresh tokens, enabling short‑lived access tokens and long‑lived refresh tokens stored in HTTP‑only cookies.  
+
+---  
+
 ## Getting Started  
 
 ### Prerequisites  
@@ -85,18 +126,18 @@ cp .env.example .env
 # Edit .env with your DB credentials, JWT secrets, etc.
 ```
 
-#### Database setup  
+### Database setup  
 
-* **PostgreSQL** – run any required migrations (if you add them) or let the app create tables on first launch.  
-* **MongoDB** – ensure the database exists; the app will create collections automatically.  
+* **PostgreSQL** – The first run will automatically create required tables via the `pg` client. If you add migrations later, run them manually.  
+* **MongoDB** – Collections are created on demand; just ensure the database exists.
 
-#### Run locally (development)  
+### Running locally (development)  
 
 ```bash
 npm run dev   # uses ts-node-dev for hot‑reloading
 ```
 
-#### Build & run (production)  
+### Building & running (production)  
 
 ```bash
 npm run build
