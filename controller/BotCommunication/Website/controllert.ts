@@ -3,7 +3,7 @@ import { getRedisClient } from "../../../Redis/connect.js";
 import { BotStructureModel } from "../../../Models/BotStructure.js";
 import { botConfiguration } from "../../../Models/BotConfiguration.js";
 import { freeStyleWebsiteBotPrompt, getToolDefinitions, fetchData } from "../../../utils/System_Prompt/Website.js";
-import OpenAI from "openai";
+import {OpenAI} from "openai";
 import { BotAnalyticsModel } from "../../../Models/BotAnalytics.js";
 import type mongoose from "mongoose";
 import crypto from "crypto";

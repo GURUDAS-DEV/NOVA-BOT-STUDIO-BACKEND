@@ -1,7 +1,7 @@
 import type { Request, Response } from "express"
 import { botConfiguration } from "../../Models/BotConfiguration.js";
 import { freeStyleWebsiteBotPrompt, getToolDefinitions, fetchData } from "../../utils/System_Prompt/Website.js";
-import OpenAI from "openai";
+import {OpenAI} from "openai";
 
 
 export const testingTheBot = async (req: Request, res: Response): Promise<Response> => {
