@@ -7,6 +7,10 @@ const NodeSchema = new Schema({
     index: true
   },
 
+  title : {
+    type : String,
+    required : true
+  },
   /**
    * What this node DOES
    */
@@ -46,6 +50,11 @@ const NodeSchema = new Schema({
       enum: ["GET", "POST"]
     },
     timeoutMs: { type: Number },
+    nextNodeId: { type: Types.ObjectId, required: false },
+    queryParameter : {
+      type: Map,
+      of: String
+    },
 
     /**
      * Save API result in session (Redis)
@@ -78,7 +87,12 @@ const NodeSchema = new Schema({
     },
 
     allowGoBack: { type: Boolean, required: true },
-    allowEnd: { type: Boolean, required: true }
+    allowEnd: { type: Boolean, required: true },
+
+    /**
+     * Custom text to display when executor is "none" and mode is "text"
+     */
+    customText: { type: String }
   },
 
   createdAt: { type: Date, default: Date.now },

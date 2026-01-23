@@ -490,6 +490,7 @@ export const createWebsiteControlledBotController = async (
       const nodeDoc: any = {
         _id: tempIdToObjectId[node.id],
         botId,
+        title: node.title || "",
         message: node.message || "",
         executor: "none",
         output: {
@@ -499,6 +500,11 @@ export const createWebsiteControlledBotController = async (
           allowEnd: node.output?.controls?.allowEnd ?? false,
         },
       };
+
+      // Store custom text for text output type when executor is "none"
+      if (node.output?.type === "text" && node.output?.customText) {
+        nodeDoc.output.customText = node.output.customText;
+      }
 
       // Determine executor type
       if (node.executor?.type === "input") {
@@ -511,20 +517,40 @@ export const createWebsiteControlledBotController = async (
         };
       } else if (node.executor?.type === "api") {
         nodeDoc.executor = "api";
+
+        // Normalize query params into an object for persistence
+        let queryParams: Record<string, string> | undefined;
+        if (Array.isArray(node.executor?.config?.params)) {
+          queryParams = node.executor.config.params.reduce(
+            (acc: Record<string, string>, param: any) => {
+              if (param?.key) acc[param.key] = param.value ?? "";
+              return acc;
+            },
+            {}
+          );
+
+          if (Object.keys(queryParams as any).length === 0) {
+            queryParams = undefined;
+          }
+        }
+
         nodeDoc.apiConfig = {
-          endpointKey: node.executor?.config?.endpointKey || "default",
+          endpointKey: node.executor?.config?.endpoint || "default",
           method: node.executor?.config?.method || "GET",
           timeoutMs: node.executor?.config?.timeoutMs || 5000,
+          // Store next node ID for API nodes with options output
+          nextNodeId: (node.output?.type === "options" && node.apiResponseMapping?.nextNodeId)
+            ? tempIdToObjectId[node.apiResponseMapping.nextNodeId]
+            : undefined,
+          queryParameter: queryParams,
           saveResponseAs: node.executor?.config?.saveResponseAs,
           useLLMSanitizer: node.executor?.config?.useLLMSanitizer || false,
         };
-      } else if (node.executor?.type === "llm") {
-        nodeDoc.executor = "llm";
       } else if (
         (!node.options || node.options.length === 0) &&
         (!node.executor || node.executor.type === "none")
       ) {
-        nodeDoc.executor = "end";
+        nodeDoc.executor = "none";
       }
 
       return nodeDoc;
@@ -622,7 +648,7 @@ export const createWebsiteControlledBotController = async (
 
     return res.status(500).json({
       message: "Failed to create controlled bot",
-      error: error instanceof Error ? error.message : "Unknown error occurred",
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   } finally {
     await session.endSession();

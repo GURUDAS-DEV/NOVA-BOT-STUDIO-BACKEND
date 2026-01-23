@@ -3,7 +3,7 @@ import { getRedisClient } from "../../../Redis/connect.js";
 import { BotStructureModel } from "../../../Models/BotStructure.js";
 import { botConfiguration } from "../../../Models/BotConfiguration.js";
 import { freeStyleWebsiteBotPrompt, getToolDefinitions, fetchData } from "../../../utils/System_Prompt/Website.js";
-import {OpenAI} from "openai";
+import { OpenAI } from "openai";
 import { BotAnalyticsModel } from "../../../Models/BotAnalytics.js";
 import type mongoose from "mongoose";
 import crypto from "crypto";
@@ -47,14 +47,14 @@ interface SessionDetail {
 }
 
 interface apiConstructorTemplate {
-    success : boolean;
-    confidence? : number;
-    apiRequest? : {
-        method : "GET";
-        endpoint : string;
-        queryParams : Object;
+    success: boolean;
+    confidence?: number;
+    apiRequest?: {
+        method: "GET";
+        endpoint: string;
+        queryParams: Object;
     };
-    error? : Object;
+    error?: Object;
 }
 
 const getFromRedisStringOnly = async (redisKey: string): Promise<any> => {
@@ -453,9 +453,10 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
 
             // Handle END_CHAT universally
             if (END_CHAT) {
-                try { await redis.del(sessionalRedisKey);
+                try {
+                    await redis.del(sessionalRedisKey);
                     res.clearCookie('sessionId');
-                 } catch {}
+                } catch { }
                 return res.status(200).json({ message: "Conversation ended. Thank you!" });
             }
 
@@ -491,9 +492,9 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     previousNodeDataFromRedis = previousNodeDataFromDb as any;
                 }
                 previousNodeDataFromRedis = previousNodeDataFromRedis;
-                await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: previousNodeId.toString(), previousNodeId: null }), { ex: 60 * 60 * 1000 });
+                await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: previousNodeId.toString(), previousNodeId: null }), { ex: 60 * 60 });
 
-                console.log("Previous Node Data from Redis:(inside, 496)", previousNodeDataFromRedis);   
+                console.log("Previous Node Data from Redis:(inside, 496)", previousNodeDataFromRedis);
                 if (previousNodeDataFromRedis?.currentNode.executor === 'none' && previousNodeDataFromRedis?.currentNode?.output?.mode === 'options') {
                     console.log("Previous Node Data Options:(inside, 499)", previousNodeDataFromRedis.options);
                     return res.status(200).json({ type: "options", nodeData1: previousNodeDataFromRedis });
@@ -530,23 +531,22 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                 }
 
                 nextNodeDataFromRedis = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
-
                 // Return next node
                 if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
 
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "options", nodeData: nextNodeDataFromRedis });
                 }
                 else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
                     return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis.output.text, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
                 else if (nextNodeDataFromRedis?.executor === 'input') {
 
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
                     return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
-                else if (nextNodeDataFromRedis?.executor === 'api') {
+                else if (nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'text') {
                     const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
                     const reqInfo = extractApiRequest(apiNode?.apiConfig);
                     console.log("API Node Data:(inside, 571)", reqInfo);
@@ -555,14 +555,79 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     }
                     const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
                     const apiData = await callingConstructApiUponUserInput(fullApiUrl);
-                    const responseToSend = await generatingResponseFromApiResult(apiNode?.title || "API Node Response", apiData);
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
-                    return res.status(200).json({ type: "api", message: responseToSend, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
+                    return res.status(200).json({ type: "api", message: apiData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                }
+
+                else if(nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'options') {
+                    console.log("API Node Data with Options:(inside, 583)", nextNodeDataFromRedis);
+                    
+                    const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
+                    const reqInfo = extractApiRequest(apiNode?.apiConfig);
+                    
+                    if (!reqInfo || !reqInfo.endpoint) {
+                        return res.status(500).json({ message: "API configuration is missing or invalid for the next node." });
+                    }
+
+                    // Build full API URL
+                    const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
+                    
+                    // Fetch raw API data (bypass sanitizer to keep full list)
+                    const rawResponse = await fetch(fullApiUrl);
+                    if (!rawResponse.ok) {
+                        return res.status(500).json({ message: "Failed to fetch data from API." });
+                    }
+                    const rawJson = await rawResponse.json();
+
+                    // Normalize to an array while keeping as many items as possible
+                    let normalizedResults: any[] = [];
+                    if (Array.isArray(rawJson)) {
+                        normalizedResults = rawJson;
+                    } else if (rawJson && Array.isArray((rawJson as any).samples)) {
+                        // If upstream still sends samples array, use it directly
+                        normalizedResults = (rawJson as any).samples;
+                    } else if (rawJson && typeof rawJson === "object") {
+                        normalizedResults = Object.values(rawJson as Record<string, any>);
+                    } else if (rawJson) {
+                        normalizedResults = [rawJson];
+                    }
+
+                    if (!normalizedResults || normalizedResults.length === 0) {
+                        return res.status(500).json({ message: "API response is invalid or empty." });
+                    }
+
+                    // Take top 4 results
+                    const topFourResults = normalizedResults.slice(0, 4);
+                    // Convert API response to options using LLM
+                    const generatedOptions = await convertApiResponseToOptions(topFourResults, apiNode?.title || "API Options");
+                    
+                    if (!generatedOptions || generatedOptions.length === 0) {
+                        return res.status(500).json({ message: "Failed to generate options from API response." });
+                    }
+
+                    // Format options with temporary IDs for frontend
+                    const formattedOptionsForFrontend = generatedOptions.map((opt: any, index: number) => ({
+                        optionId: `api_option_${index}`,
+                        intent: opt.label || opt.intent || `Option ${index + 1}`,
+                        value: opt.value || opt.intent,
+                        order: index,
+                    }));
+
+                    // Prepare node data with options
+                    const nodeDataWithOptions = {
+                        currentNode: apiNode,
+                        options: formattedOptionsForFrontend,
+                        isApiGenerated: true,
+                    };
+
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
+                    return res.status(200).json({ type: "options", nodeData: nodeDataWithOptions });
                 }
             }
             else if (currentNodeData.executor === 'none' && currentNodeData.output?.mode === 'text') {
-                const {GO_BACK, END_CHAT} = req.body;
-                if(GO_BACK){
+                const { GO_BACK, END_CHAT } = req.body;
+                if (GO_BACK) {
                     const previousNodeId = (sessionalBotDetails as any)?.previousNodeId;
                     if (!previousNodeId) {
                         return res.status(400).json({ message: "No previous node to go back to." });
@@ -579,7 +644,7 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                         previousNodeDataFromRedis = previousNodeDataFromDb;
                     };
                     previousNodeDataFromRedis = previousNodeDataFromRedis?.currentNode || previousNodeDataFromRedis;
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: previousNodeId.toString(), previousNodeId: null }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: previousNodeId.toString(), previousNodeId: null }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "text", nodeData: previousNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
@@ -602,15 +667,15 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
 
                 // Return next node
                 if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "options", nodeData: nextNodeDataFromRedis });
                 }
                 else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
                 else if (nextNodeDataFromRedis?.executor === 'input') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
                 else if (nextNodeDataFromRedis?.executor === 'api') {
@@ -621,7 +686,7 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
                     const apiData = await callingConstructApiUponUserInput(fullApiUrl);
                     const responseToSend = await generatingResponseFromApiResult((nextNodeDataFromRedis as any)?.title || "API Node Response", apiData);
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "api", message: responseToSend, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
             }
@@ -629,7 +694,7 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                 if (!input) {
                     return res.status(400).json({ message: "A Valid Input is required for this node." });
                 }
-                
+
                 const nextNodeId = currentNodeData.inputConfig?.nextNodeId;
                 if (!nextNodeId) {
                     return res.status(500).json({ message: "Next node ID is not configured properly. Contact bot owner. Thanks for using us." });
@@ -651,29 +716,29 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
 
                 // Return next node
                 if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "options", nodeData: nextNodeDataFromRedis });
                 }
 
                 else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
                 else if (nextNodeDataFromRedis?.executor === 'input') {
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 * 1000 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
                     return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
-                else if (nextNodeDataFromRedis?.executor === 'api') {
-                    
-                    const apiFormatFromLLM : apiConstructorTemplate = await constructApiUponUserInput(nextNodeDataFromRedis.apiConfig, input);
-                    
-                    if(!apiFormatFromLLM.success){
+                else if (nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'text') {
+
+                    const apiFormatFromLLM: apiConstructorTemplate = await constructApiUponUserInput(nextNodeDataFromRedis.apiConfig, input);
+
+                    if (!apiFormatFromLLM.success) {
                         return res.status(500).json({ message: apiFormatFromLLM.error || "API construction failed. Please try again." });
                     }
-                    
-                    if(apiFormatFromLLM.confidence && apiFormatFromLLM.confidence < 0.5){
+
+                    if (apiFormatFromLLM.confidence && apiFormatFromLLM.confidence < 0.5) {
                         return res.status(200).json({ message: "I'm not confident enough to make the API call based on your input. Could you please rephrase or provide more details?" });
                     }
 
@@ -682,26 +747,19 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     const fullApiUrl = buildUrl(constructedApiEndpoint, constructedApiQueryParams);
 
                     const response = await callingConstructApiUponUserInput(fullApiUrl);
-                    if(!response){
+                    if (!response) {
                         return res.status(500).json({ message: response || "API call failed. Please try again." });
                     }
 
                     const responseToSend = await generatingResponseFromApiResult(input, response);
-                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 * 1000 });
-                    return res.status(200).json({ type: "api", message: responseToSend, back : {label : "Go Back", _id : "GO_BACK"}, end : {label : "End Chat", _id : "END_CHAT"} });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
+                    return res.status(200).json({ type: "api", message: responseToSend, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
                 return res.status(200).json({ message: "Current node expects user input. Please provide the required input." });
             }
-            else if (currentNodeData.executor === 'api') {
-                const reqInfo = extractApiRequest((currentNodeData as any)?.apiConfig);
-                if (!reqInfo || !reqInfo.endpoint) {
-                    return res.status(500).json({ message: "API configuration is missing or invalid for the current node." });
-                }
-                const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
-                const apiData = await callingConstructApiUponUserInput(fullApiUrl);
-                const responseToSend = await generatingResponseFromApiResult((currentNodeData as any)?.title || "API Node Response", apiData);
-                return res.status(200).json({ type: "api", message: responseToSend, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+            else if(currentNodeData.executor === 'api' && currentNodeData.output?.mode ==='options') {
+
             }
 
         }
@@ -741,19 +799,30 @@ const processInitialNode = async (
         };
 
         await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeWithOptions), { ex: 86400 });
-        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
 
         return res.status(200).json({ type: "options", nodeData: nodeWithOptions });
     } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
         await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeData), { ex: 86400 });
-        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
         return res.status(200).json({ type: "text", nodeData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
     } else if (nodeData.executor === 'input') {
         await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeData), { ex: 86400 });
-        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
         return res.status(200).json({ type: "input", nodeData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
-    } else if (nodeData.executor === 'api') {
-        // API executor - implementation left empty as requested
+    } else if (nodeData.executor === 'api' && nodeData.output?.mode === 'text') {
+        const apiEndpoint = nodeData.apiConfig?.endpointKey;
+        if (!apiEndpoint) {
+            return res.status(500).json({ message: "API endpoint is not configured properly. Contact bot owner. Thanks for using us." });
+        }
+
+        const response = await callingConstructApiUponUserInput(apiEndpoint);
+        if (!response) {
+            return res.status(500).json({ message: "API call failed. Please try again." });
+        }
+
+        console.log("API Node Data: ", response);
+        return res.status(200).json({ type: "api", message: response, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
     }
 
     return res.status(500).json({ message: "Node type not recognized." });
@@ -771,16 +840,28 @@ const processInitialNodeFromRedis = async (
     const nodeData = nodeDataFromRedis.currentNode || nodeDataFromRedis;
 
     if (nodeData.executor === 'none' && nodeData.output?.mode === 'options') {
-        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
         return res.status(200).json({ type: "options", nodeData: nodeDataFromRedis });
     } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
-        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
         return res.status(200).json({ type: "text", nodeData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
     } else if (nodeData.executor === 'input') {
-        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 * 1000 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
         return res.status(200).json({ type: "input", nodeData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
-    } else if (nodeData.executor === 'api') {
-        // API executor - implementation left empty as requested
+    } else if (nodeData.executor === 'api' && nodeData.output?.mode === 'text') {
+        const apiEndpoint = nodeData.apiConfig?.endpointKey;
+        if (!apiEndpoint) {
+            return res.status(500).json({ message: "API endpoint is not configured properly. Contact bot owner. Thanks for using us." });
+        }
+        const response = await callingConstructApiUponUserInput(apiEndpoint);
+        if (!response) {
+            return res.status(500).json({ message: "API call failed. Please try again." });
+        }
+
+        console.log("API Node Data: ", response);
+
+        return res.status(200).json({ type: "api", message: response, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+
     }
 
     return res.status(500).json({ message: "Node type not recognized." });
@@ -885,22 +966,23 @@ const constructApiUponUserInput = async (apiTemplate: any, userInput: string) =>
 }
 
 function buildUrl(endpoint: string, queryParams: Object): string {
-  const url = new URL(endpoint);
-  Object.entries(queryParams || {}).forEach(([key, val]) => {
-    if (val === null || val === undefined) return;
-    if (Array.isArray(val)) {
-      val.forEach(v => url.searchParams.append(key, String(v)));
-    } else {
-      url.searchParams.set(key, String(val));
-    }
-  });
-  return url.toString();
+    const url = new URL(endpoint);
+    Object.entries(queryParams || {}).forEach(([key, val]) => {
+        if (val === null || val === undefined) return;
+        if (Array.isArray(val)) {
+            val.forEach(v => url.searchParams.append(key, String(v)));
+        } else {
+            url.searchParams.set(key, String(val));
+        }
+    });
+    return url.toString();
 }
 
 // Extract endpoint and query params from apiConfig in a tolerant way
 function extractApiRequest(apiConfig: any): { endpoint: string; queryParams?: Object } | null {
+    console.log("Extracting API Request from Config:", apiConfig);
     if (!apiConfig) return null;
-    const endpoint = apiConfig?.apiRequest?.endpoint || apiConfig?.endpoint || "";
+    const endpoint = apiConfig?.apiRequest?.endpointKey || apiConfig?.endpointKey || "";
     const queryParams = apiConfig?.apiRequest?.queryParams || apiConfig?.queryParams || {};
     return { endpoint, queryParams };
 }
@@ -915,25 +997,25 @@ async function invokeApiAndSummarize(apiConfig: any, titleFallback: string): Pro
     return message as string;
 }
 
-const callingConstructApiUponUserInput = async (apiEndpoint : string) => {
-    try{
+const callingConstructApiUponUserInput = async (apiEndpoint: string) => {
+    try {
         const response = await fetch(apiEndpoint);
-        if(response.ok){
+        if (response.ok) {
             const data = await response.json();
             const sanitizedData = sanitizeAPIResponse(data);
             return sanitizedData.samples || [];
         }
         throw new Error("Failed to fetch data");
     }
-    catch(e){
+    catch (e) {
         throw e;
     }
 }
 
 
-export const generatingResponseFromApiResult = async(input : string, apiResponseData : any) => {    
-    try{
-        if(!input || !apiResponseData){
+export const generatingResponseFromApiResult = async (input: string, apiResponseData: any) => {
+    try {
+        if (!input || !apiResponseData) {
             return {
                 success: false,
                 message: "Invalid input or API response data."
@@ -971,8 +1053,121 @@ export const generatingResponseFromApiResult = async(input : string, apiResponse
         let result = message.content;
         return result;
     }
-    catch(e){
+    catch (e) {
         throw e;
     }
 
+}
+
+// Convert API response to options using LLM
+const convertApiResponseToOptions = async (apiData: any[], contextTitle: string = "API Options") => {
+    try {
+        if (!apiData || apiData.length === 0) {
+            throw new Error("No API data provided");
+        }
+
+        // Ensure we have at least some data to work with (up to 4 items)
+        const dataToProcess = apiData.slice(0, 4);
+        const dataCount = dataToProcess.length;
+        console.log(`Converting ${dataCount} API items to options using LLM`);
+
+        const openai = new OpenAI({
+            apiKey: process.env.API_KEY_FOR_API_CALLING_IN_CONTROLLED_BOT,
+            baseURL: "https://api.groq.com/openai/v1",
+        });
+
+        const systemPrompt = `You are an expert at converting API responses into user-friendly options for a chatbot.
+
+Your task:
+1. You will receive ${dataCount} items from an API response
+2. Create EXACTLY ${dataCount} options - one for each item
+3. Extract the most relevant information from each item
+4. Create clear, concise option labels that users can understand
+5. Return ONLY a valid JSON array with EXACTLY ${dataCount} objects
+
+Required format (MUST be valid JSON array):
+[
+  {
+    "label": "Clear, user-friendly option text (max 60 characters)",
+    "value": "Relevant value or identifier from API data",
+    "intent": "Short intent description"
+  }
+]
+
+CRITICAL RULES:
+- MUST return exactly ${dataCount} objects in the array
+- Each object MUST have: label, value, and intent fields
+- Labels must be clear, concise, and actionable
+- Values must be unique identifiers or keys from the data
+- Intent should describe what this option represents
+- Return ONLY the JSON array, no additional text, explanation, or code blocks
+- Do not use code blocks like \`\`\`json\`\`\`
+- If API data has fields like 'name', 'title', 'id', use them
+- If any field is missing, create a reasonable default based on context`;
+
+        const response = await openai.chat.completions.create({
+            model: "openai/gpt-oss-safeguard-20b",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Context: ${contextTitle}\n\nAPI Data (${dataCount} items) to convert:\n${JSON.stringify(dataToProcess, null, 2)}\n\nGenerate exactly ${dataCount} options.` }
+            ],
+            temperature: 0.3,
+        });
+
+        console.log("LLM Token Usage for Options Conversion:", response.usage?.completion_tokens);
+
+        if (!response || !response.choices || response.choices.length === 0) {
+            throw new Error("Failed to get response from LLM");
+        }
+
+        const message = response.choices[0]?.message;
+        if (!message || !message.content) {
+            throw new Error("No content in LLM response");
+        }
+
+        // Clean up response - remove code blocks if present
+        let cleanedContent = message.content
+            .replace(/```json/g, '')
+            .replace(/```/g, '')
+            .replace(/^[\s]*\[/, '[') // Remove leading whitespace before [
+            .replace(/\][\s]*$/, ']') // Remove trailing whitespace after ]
+            .trim();
+        
+        // Parse the JSON response
+        const parsedOptions = JSON.parse(cleanedContent);
+
+        if (!Array.isArray(parsedOptions)) {
+            throw new Error("LLM response is not an array");
+        }
+
+        // If LLM returns fewer options than expected, pad with fallback
+        if (parsedOptions.length < dataCount) {
+            console.warn(`LLM returned ${parsedOptions.length} options, expected ${dataCount}. Padding with fallback options.`);
+            
+            // Create fallback options for missing items
+            for (let i = parsedOptions.length; i < dataCount; i++) {
+                const item = dataToProcess[i];
+                parsedOptions.push({
+                    label: item?.name || item?.title || `Option ${i + 1}`,
+                    value: item?.id || item?.value || String(i),
+                    intent: `Option ${i + 1}`,
+                });
+            }
+        }
+
+        // Return exactly the number of options we have (up to 4)
+        return parsedOptions.slice(0, dataCount);
+    } catch (e) {
+        console.error("Error in convertApiResponseToOptions:", e);
+        
+        // Fallback: create basic options from raw data
+        const fallbackOptions = apiData.slice(0, 4).map((item, index) => ({
+            label: item?.name || item?.title || item?.text || `Option ${index + 1}`,
+            value: item?.id || item?.value || item?.key || String(index),
+            intent: item?.description || `Option ${index + 1}`,
+        }));
+        
+        console.log(`Returning ${fallbackOptions.length} fallback options`);
+        return fallbackOptions;
+    }
 }
