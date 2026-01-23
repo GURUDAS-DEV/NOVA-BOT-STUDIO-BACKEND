@@ -365,27 +365,4 @@ CMD ["node", "dist/index.js"]
 Build & run:
 
 ```bash
-docker build -t nova-bot-studio-backend .
-docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
-```
-
-### Cloud platforms  
-
-* **Heroku / Render** – set the same environment variables, point the start command to `npm start`.  
-* **AWS ECS / Fargate** – use the Docker image above; configure a load balancer to forward traffic to port 9000.  
-
-### Performance considerations  
-
-* Enable HTTP security headers: `app.use(require('helmet')())`.  
-* Tune PostgreSQL connection pool (`max` in `pg.Pool`).  
-* Adjust Redis `maxmemory-policy` based on your caching strategy.  
-
----  
-
-## Contributing  
-
-We welcome contributions! Please follow these steps:
-
-1. **Fork** the repository and create a feature branch.  
-2. **Install** the project locally (see *Installation* above).  
-3. **Run
+docker build
