@@ -406,9 +406,3 @@ metadata:
 spec:
   replicas: 2
   selector:
-    matchLabels:
-      app: nova-bot-studio-backend
-  template:
-    metadata:
-      labels:
-        app: nova-bot-st
