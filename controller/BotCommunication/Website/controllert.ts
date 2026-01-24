@@ -779,7 +779,7 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
             else if (currentNodeData.executor === 'api' && currentNodeData.output?.mode === 'options') {
 
                 const currentNodeOptions = currentNodeDataFromRedis.options as FormattedOption[];
-                const optionId = currentNodeOptions.find((option) => option.intent === input || String(option.optionId) === input)?.toNodeId;
+                const optionName = currentNodeOptions.find((option) => option.intent === input || String(option.optionId) === input)?.intent;
 
                 const nextNodeId = currentNodeData.apiConfig?.nextNodeId;
                 if (!nextNodeId) {
@@ -814,6 +814,82 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
                     return res.status(200).json({ type: "input", nodeData: nextNodeDataFromRedis, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                }
+                else if(nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'text') {
+                    const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
+                    const reqInfo = extractApiRequest(apiNode?.apiConfig);
+                    if (!reqInfo || !reqInfo.endpoint) {
+                        return res.status(500).json({ message: "API configuration is missing or invalid for the next node." });
+                    }
+
+                    const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
+                    const apiData = await callingConstructApiUponUserInput(fullApiUrl);
+
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
+                    return res.status(200).json({ type: "api", message: apiData, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                }
+                else if(nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'options') {
+                    const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
+                    const reqInfo = extractApiRequest(apiNode?.apiConfig);
+
+                    if (!reqInfo || !reqInfo.endpoint) {
+                        return res.status(500).json({ message: "API configuration is missing or invalid for the next node." });
+                    }
+                    // Build full API URL
+                    const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});  
+                    // Fetch raw API data (bypass sanitizer to keep full list)
+                    const rawResponse = await fetch(fullApiUrl);
+                    if (!rawResponse.ok) {
+                        return res.status(500).json({ message: "Failed to fetch data from API." });
+                    }   
+                    const rawJson = await rawResponse.json();   
+
+                    // Normalize to an array while keeping as many items as possible
+                    let normalizedResults: any[] = [];  
+                    if (Array.isArray(rawJson)) {
+                        normalizedResults = rawJson;
+                    }       
+                    else if (rawJson && Array.isArray((rawJson as any).samples)) {
+                        // If upstream still sends samples array, use it directly
+                        normalizedResults = (rawJson as any).samples;
+                    }
+                    else if (rawJson && typeof rawJson === "object") {
+                        normalizedResults = Object.values(rawJson as Record<string, any>);
+                    }
+                    else if (rawJson) {
+                        normalizedResults = [rawJson];
+                    }
+
+                    if (!normalizedResults || normalizedResults.length === 0) {
+                        return res.status(500).json({ message: "API response is invalid or empty." });
+                    }
+
+                    // Take top 4 results
+                    const topFourResults = normalizedResults.slice(0, 4);
+                    // Convert API response to options using LLM
+                    const generatedOptions = await convertApiResponseToOptions(topFourResults, apiNode?.title || "API Options");
+                    if (!generatedOptions || generatedOptions.length === 0) {
+                        return res.status(500).json({ message: "Failed to generate options from API response." });
+                    }
+                    
+                    // Format options with temporary IDs for frontend
+                    const formattedOptionsForFrontend = generatedOptions.map((opt: any, index: number) => ({
+                        optionId: `api_option_${index}`,
+                        intent: opt.label || opt.intent || `Option ${index + 1}`,
+                        value: opt.value || opt.intent,
+                        order: index,
+                    }));
+
+                    // Prepare node data with options
+                    const nodeDataWithOptions = {  
+                        currentNode: apiNode,
+                        options: formattedOptionsForFrontend,
+                        isApiGenerated: true,
+
+                    };
+                    await redis.set(redisKeyForNodes(nextNodeId.toString()), JSON.stringify(nodeDataWithOptions), { ex: 60 * 60 });
+                    await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
+                    return res.status(200).json({ type: "options", nodeData: nodeDataWithOptions });
                 }
 
             }
