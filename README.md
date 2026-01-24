@@ -11,7 +11,7 @@ NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for buildin
 
 * **Bot lifecycle management** – create, update, delete, and run bots.  
 * **AI feature toggling** – enable/disable advanced AI capabilities per bot.  
-* **Secure API‑key handling** – generation, hashing, and revocation with Redis‑backed caching.  
+* **Secure API‑key handling** – generation, hashing, revocation with Redis‑backed caching.  
 * **Robust authentication** – JWT‑based login/registration with refresh tokens and role‑based middleware.  
 * **Bot analytics** – collect, store, and query usage metrics per bot.  
 * **Multi‑database support** – PostgreSQL for relational data, MongoDB for flexible storage.  
@@ -36,6 +36,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Redis Caching** | Centralised client for API‑key validation, session storage, and bot messaging. | ✅ Stable |
 | **CORS Configuration** | Whitelisted origins with credentials support. | ✅ Stable |
 | **Testing Utilities** | Ready‑made test router and controller for CI pipelines. | ✅ Stable |
+| **System Prompt Utilities** | Re‑usable helpers (`TextEnhancer`, `TextValidator`, `ExampleValidator`, `Website`) for building robust AI prompts. | ✅ Stable |
 
 ---  
 
@@ -69,6 +70,8 @@ src/
 │   ├─ AI_Feature_Management/
 │   ├─ AdvanceBotManagement/
 │   ├─ BotAnalyticsManagement/
+│   ├─ BotCommunication/
+│   │   └─ Website/
 │   └─ Testing/
 ├─ Router/                # Express routers – one per domain
 │   ├─ Authentication/
@@ -78,6 +81,8 @@ src/
 │   ├─ AI_Feature_Management/
 │   ├─ Advance_Bot_Management/
 │   ├─ BotAnalytics/
+│   ├─ BotCommunication/
+│   │   └─ Website/
 │   └─ Testing/
 ├─ Models/                # Mongoose / TypeORM schemas
 ├─ utils/
@@ -128,7 +133,7 @@ cp .env.example .env
 
 ### Database setup  
 
-* **PostgreSQL** – The first run will automatically create required tables via the `pg` client. If you add migrations later, run them manually.  
+* **PostgreSQL** – The first run will automatically create required tables via the `pg` client.  
 * **MongoDB** – Collections are created on demand; just ensure the database exists.
 
 ### Running locally (development)  
@@ -167,6 +172,8 @@ docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 | `JWT_ACCESS_SECRET` | Secret for access tokens | `supersecretaccess` |
 | `JWT_REFRESH_SECRET` | Secret for refresh tokens | `supersecretrefresh` |
 | `CORS_ORIGINS` | Comma‑separated list of allowed origins | `http://localhost:3000` |
+| `API_KEY_SALT_ROUNDS` | Bcrypt salt rounds for API‑key hashing | `12` |
+| `SESSION_TTL_SECONDS` | Redis TTL for session entries | `86400` |
 
 **Example `.env` snippet**
 
@@ -178,6 +185,8 @@ REDIS_URL=redis://localhost:6379
 JWT_ACCESS_SECRET=yourAccessSecret
 JWT_REFRESH_SECRET=yourRefreshSecret
 CORS_ORIGINS=http://localhost:3000
+API_KEY_SALT_ROUNDS=12
+SESSION_TTL_SECONDS=86400
 ```
 
 ---  
@@ -258,7 +267,29 @@ Content-Type: application/json
 }
 ```
 
-The response contains the bot’s reply and a status flag.
+Response (example):
+
+```json
+{
+  "reply": "Hi there! How can I assist you today?",
+  "status": "success"
+}
+```
+
+### Generate an API Key (protected)  
+
+```typescript
+await axios.post(
+  'http://localhost:9000/api/APIKeyManagement',
+  { name: 'My Service' },
+  {
+    headers: { Cookie: `refreshToken=${refreshToken}` },
+    withCredentials: true,
+  }
+);
+```
+
+The response contains the raw API key (shown only once) and its hashed representation stored in Redis.
 
 ---  
 
@@ -365,41 +396,15 @@ docker build -t nova-bot-studio-backend .
 docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ```
 
----  
+### Kubernetes (quick reference)
 
-## Contributing  
-
-1. **Fork the repository**  
-2. **Create a feature branch** (`git checkout -b feat/awesome-feature`)  
-3. **Commit your changes** (`git commit -m "feat: add awesome feature"`)  
-4. **Push to your fork** (`git push origin feat/awesome-feature`)  
-5. **Open a Pull Request**  
-
-### Development workflow  
-
-* Run `npm run lint` and `npm run format` before committing.  
-* Ensure all tests pass (`npm test`).  
-* Keep the PR focused on a single concern.  
-
-### Code style  
-
-* Use **Prettier** formatting (already configured).  
-* Follow the existing folder structure (`controller/`, `router/`, `utils/`, etc.).  
-* Write TypeScript with strict typing (`tsconfig.json` enforces `strict` mode).  
-
----  
-
-## License & Credits  
-
-This project is licensed under the **MIT License** – see the [LICENSE](LICENSE) file for details.  
-
-**Contributors**  
-
-- GURUDAS‑DEV (owner)  
-- Open‑source community contributors (via pull requests)  
-
-**Acknowledgments**  
-
-- Express, TypeScript, PostgreSQL, MongoDB, Redis, Jest, Supertest, Docker, and all npm packages listed in `package.json`.  
-
----  
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nova-bot-studio-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app:
