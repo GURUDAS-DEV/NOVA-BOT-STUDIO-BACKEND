@@ -267,7 +267,7 @@ Content-Type: application/json
 }
 ```
 
-Response (example):
+**Response (example)**
 
 ```json
 {
@@ -396,13 +396,15 @@ docker build -t nova-bot-studio-backend .
 docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
 ```
 
-### Kubernetes (quick reference)
+---  
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nova-bot-studio-backend
-spec:
-  replicas: 2
-  selector:
+## Contributing  
+
+We welcome contributions! Please follow these steps:
+
+1. **Fork the repository** and clone your fork.  
+2. **Create a feature branch** (`git checkout -b feat/your-feature`).  
+3. **Install dependencies** (`npm ci`).  
+4. **Make your changes**, ensuring they are covered by tests.  
+5. **Run the test suite** (`npm test`). All tests must pass.  
+6. **Lint & format** (`npm run
