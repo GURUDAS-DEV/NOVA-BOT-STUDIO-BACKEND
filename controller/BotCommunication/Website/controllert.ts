@@ -871,7 +871,7 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     if (!generatedOptions || generatedOptions.length === 0) {
                         return res.status(500).json({ message: "Failed to generate options from API response." });
                     }
-                    
+
                     // Format options with temporary IDs for frontend
                     const formattedOptionsForFrontend = generatedOptions.map((opt: any, index: number) => ({
                         optionId: `api_option_${index}`,
@@ -956,6 +956,62 @@ const processInitialNode = async (
 
         console.log("API Node Data: ", response);
         return res.status(200).json({ type: "api", message: response, back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+    }
+    else if( nodeData.executor === 'api' && nodeData.output?.mode === 'options') {
+        const apiNode = nodeData;
+        const reqInfo = extractApiRequest(apiNode?.apiConfig);
+        if (!reqInfo || !reqInfo.endpoint) {
+            return res.status(500).json({ message: "API configuration is missing or invalid for the next node." });
+        }
+        // Build full API URL
+        const fullApiUrl = buildUrl(reqInfo.endpoint, reqInfo.queryParams || {});
+        // Fetch raw API data (bypass sanitizer to keep full list)
+        const rawResponse = await fetch(fullApiUrl);
+        if (!rawResponse.ok) {
+            return res.status(500).json({ message: "Failed to fetch data from API." });
+        }   
+        const rawJson = await rawResponse.json();
+        // Normalize to an array while keeping as many items as possible
+        let normalizedResults: any[] = [];
+        if (Array.isArray(rawJson)) {
+            normalizedResults = rawJson;
+        } else if (rawJson && Array.isArray((rawJson as any).samples)) {
+            // If upstream still sends samples array, use it directly
+            normalizedResults = (rawJson as any).samples;
+        } else if (rawJson && typeof rawJson === "object") {
+            normalizedResults = Object.values(rawJson as Record<string, any>);
+        } else if (rawJson) {
+            normalizedResults = [rawJson];
+        }
+        if (!normalizedResults || normalizedResults.length === 0) {
+            return res.status(500).json({ message: "API response is invalid or empty." });
+        }
+
+        // Take top 4 results
+        const topFourResults = normalizedResults.slice(0, 4);
+    
+        // Convert API response to options using LLM
+
+        const generatedOptions = await convertApiResponseToOptions(topFourResults, apiNode?.title || "API Options");
+        if (!generatedOptions || generatedOptions.length === 0) {
+            return res.status(500).json({ message: "Failed to generate options from API response." });
+        }
+        // Format options with temporary IDs for frontend
+        const formattedOptionsForFrontend = generatedOptions.map((opt: any, index: number) => ({
+            optionId: `api_option_${index}`,
+            intent: opt.label || opt.intent || `Option ${index + 1}`,
+            value: opt.value || opt.intent,
+            order: index,
+        }));
+        // Prepare node data with options
+        const nodeDataWithOptions = {
+            currentNode: apiNode,
+            options: formattedOptionsForFrontend,
+            isApiGenerated: true,
+        };
+        await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeDataWithOptions), { ex: 86400 });
+        await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
+        return res.status(200).json({ type: "options", nodeData: nodeDataWithOptions });
     }
 
     return res.status(500).json({ message: "Node type not recognized." });
