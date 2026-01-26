@@ -408,3 +408,4 @@ We welcome contributions! Please follow these steps:
 4. **Make your changes**, ensuring they are covered by tests.  
 5. **Run the test suite** (`npm test`). All tests must pass.  
 6. **Lint & format** (`npm run
+7. Happy bot Building 🏫🏫
