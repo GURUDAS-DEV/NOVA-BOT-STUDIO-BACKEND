@@ -423,4 +423,6 @@ This project is licensed under the **MIT License** – see the [LICENSE](LICENSE
 **Authors & Maintainers**
 
 * **Gurudas Dev** – Project lead & core maintainer  
-* **Contributors** – See the [contributors graph](https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/graphs
+* **Contributors** – See the [contributors graph](https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/graphs/contributors)  
+
+---  
