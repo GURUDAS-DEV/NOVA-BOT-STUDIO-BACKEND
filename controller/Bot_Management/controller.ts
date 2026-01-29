@@ -17,32 +17,32 @@ import { platform } from "os";
 //-----------------------------------------------------------------------------------------------------------------//
 
 export const createBotController = async (req: Request, res: Response): Promise<Response> => {
-    try {
-        const { userId, botName, botDescription, botAvatar, platform, style} = req.body;
+  try {
+    const { userId, botName, botDescription, botAvatar, platform, style } = req.body;
 
-        if(!userId || !botName || !platform || !style){
-            return res.status(400).json({ message: "Required fields are missing" });
-        }
-
-        const createdBot = await BotStructureModel.create({
-            userId,
-            botName,
-            botDescription,
-            botAvatar,
-            platform,
-            style,
-            status: "draft",
-        })
-        if (!createdBot) {
-            return res.status(400).json({ message: "Failed to create bot" });
-        }
-
-
-        return res.status(200).json({ message: "Bot created successfully", id : createdBot._id });
+    if (!userId || !botName || !platform || !style) {
+      return res.status(400).json({ message: "Required fields are missing" });
     }
-    catch (error) {
-        return res.status(500).json({ message: "Internal Server Error", error });
+
+    const createdBot = await BotStructureModel.create({
+      userId,
+      botName,
+      botDescription,
+      botAvatar,
+      platform,
+      style,
+      status: "draft",
+    })
+    if (!createdBot) {
+      return res.status(400).json({ message: "Failed to create bot" });
     }
+
+
+    return res.status(200).json({ message: "Bot created successfully", id: createdBot._id });
+  }
+  catch (error) {
+    return res.status(500).json({ message: "Internal Server Error", error });
+  }
 };
 
 
@@ -53,7 +53,7 @@ export const createBotController = async (req: Request, res: Response): Promise<
 //-----------------------------------------------------------------------------------------------------------------//
 
 export const getBotDetailsForHomePageController = async (req: Request, res: Response): Promise<Response> => {
-    try {
+  try {
     const userId = (req as any).user?.userId;
     if (!userId) {
       return res.status(400).json({ message: "User ID is required" });
@@ -123,10 +123,10 @@ export const getBotDetailsForHomePageController = async (req: Request, res: Resp
       noOfBots,
       recentBots,
     });
-    }
-    catch (e) {
-        return res.status(500).json({ message: "Internal Server Error", e });
-    }
+  }
+  catch (e) {
+    return res.status(500).json({ message: "Internal Server Error", e });
+  }
 
 }
 //---------------------------------------------------------------------------------------------------------------//
@@ -160,7 +160,7 @@ export const getUnifiedBotsForManagePageController = async (req: Request, res: R
       {
         $project: {
           _id: 1,
-          platform : "$platform",
+          platform: "$platform",
           name: "$name",
           status: 1,
           style: { $literal: "CONTROLLED" },
@@ -178,7 +178,7 @@ export const getUnifiedBotsForManagePageController = async (req: Request, res: R
               $project: {
                 _id: 1,
                 name: "$botName",
-                platform : "$platform",
+                platform: "$platform",
                 status: 1,
                 style: { $literal: "FREESTYLE" },
                 created_at: "$created_at",
@@ -242,49 +242,51 @@ export const getUnifiedBotsForManagePageController = async (req: Request, res: R
 
 
 export const deleteBotController = async (req: Request, res: Response): Promise<Response> => {
-    try {
-        const userId = (req as any).user?.userId;
-        const { botId } = req.body;
-        if (!userId) {
-            return res.status(400).json({ message: "User ID is required" });
-        }
-
-        const bot = await BotStructureModel.findById(botId);
-        if (!bot) {
-            return res.status(404).json({ message: "Bot not found" });
-        }
-
-        if (bot.userId !== userId) {
-            return res.status(403).json({ message: "Forbidden: You don't have permission to delete this bot" });
-        }
-        
-        const stringBotId = bot._id.toString();
-        console.log("Revoking API Key for botId:", stringBotId);
-        
-        // Update API key - use exact column names as defined in schema with double quotes
-        const {data, error} = await supabase
-            .from("API_KEY")
-            .update({ 
-                isRevoked: true,
-                Revoked_at: new Date().toISOString()
-            })
-            .eq("botId", stringBotId)
-            .select();
-
-        if(error){
-            console.error("Error revoking API key:", error);
-            return res.status(500).json({ message : "Error revoking API key.", error : error.message });
-        }
-        
-        bot.status = transistionBotLifecycle(bot.status as any, "deleted");
-        bot.deleted_at = new Date();
-        await bot.save();
-
-        return res.status(200).json({ message: "Bot Deleted Successfully" });
+  try {
+    const userId = (req as any).user?.userId;
+    const { botId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
     }
-    catch (e) {
-        return res.status(500).json({ message: "Internal Server Error", e });
+
+    let bot = await BotStructureModel.findById(botId);
+    if (!bot) {
+      bot = await ControlledBotModel.findById(botId);
+      if (!bot)
+        return res.status(404).json({ message: "Bot not found" });
     }
+
+    if (bot.userId !== userId) {
+      return res.status(403).json({ message: "Forbidden: You don't have permission to delete this bot" });
+    }
+
+    const stringBotId = bot._id.toString();
+    console.log("Revoking API Key for botId:", stringBotId);
+
+    // Update API key - use exact column names as defined in schema with double quotes
+    const { data, error } = await supabase
+      .from("API_KEY")
+      .update({
+        isRevoked: true,
+        Revoked_at: new Date().toISOString()
+      })
+      .eq("botId", stringBotId)
+      .select();
+
+    if (error) {
+      console.error("Error revoking API key:", error);
+      return res.status(500).json({ message: "Error revoking API key.", error: error.message });
+    }
+
+    bot.status = transistionBotLifecycle(bot.status as any, "deleted");
+    bot.deleted_at = new Date();
+    await bot.save();
+
+    return res.status(200).json({ message: "Bot Deleted Successfully" });
+  }
+  catch (e) {
+    return res.status(500).json({ message: "Internal Server Error", e });
+  }
 }
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -295,23 +297,64 @@ export const deleteBotController = async (req: Request, res: Response): Promise<
 
 export const getDeletedBotsController = async (req: Request, res: Response): Promise<Response> => {
 
-    try {
-        const userId = (req as any).user?.userId;
-        if (!userId) {
-            return res.status(400).json({ message: "User ID is required" });
-        };
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    };
 
-        const deletedBots = await BotStructureModel.find({ userId }).where({ status: "deleted" }).sort({ created_at: -1 });
+    const freestyleColl = BotStructureModel.collection.name;
 
-        if (!deletedBots || deletedBots.length === 0) {
-            return res.status(404).json({ message: "No deleted bots found" });
-        }
+   const pipeline: any[] = [
+      { $match: { userId, status: { $eq: "deleted" } } },
+      {
+        $project: {
+          _id: 1,
+          platform: "$platform",
+          name: "$name",
+          status: 1,
+          style: { $literal: "CONTROLLED" },
+          created_at: "$createdAt",
+          updated_at: "$updatedAt",
+          deleted_at : "$deleted_at",
+          entryNodeId: "$entryNodeId",
+        },
+      },
+      {
+        $unionWith: {
+          coll: freestyleColl,
+          pipeline: [
+            { $match: { userId: userId, status: { $eq: "deleted" } } },
+            {
+              $project: {
+                _id: 1,
+                name: "$botName",
+                platform: "$platform",
+                status: 1,
+                style: { $literal: "FREESTYLE" },
+                created_at: "$created_at",
+                updated_at: "$updated_at",
+                deleted_at : "$deleted_at",
+                entryNodeId: { $literal: null },
+              },
+            },
+          ],
+        },
+      },
+    ];
 
-        return res.status(200).json({ message: "Deleted Bots fetched successfully", deletedBots });
+
+    const deletedBots = await ControlledBotModel.aggregate(pipeline);
+
+    if (!deletedBots || deletedBots.length === 0) {
+      return res.status(404).json({ message: "No deleted bots found" });
     }
-    catch (e) {
-        return res.status(500).json({ message: "Internal Server Error", e });
-    }
+
+    return res.status(200).json({ message: "Deleted Bots fetched successfully", deletedBots });
+  }
+  catch (e) {
+    return res.status(500).json({ message: "Internal Server Error", e });
+  }
 }
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -321,41 +364,50 @@ export const getDeletedBotsController = async (req: Request, res: Response): Pro
 //-----------------------------------------------------------------------------------------------------------------//
 
 export const restoreDeletedBotController = async (req: Request, res: Response): Promise<Response> => {
-    try {
-        const userId = (req as any).user?.userId;
-        const { botId } = req.body;
+  try {
+    const userId = (req as any).user?.userId;
+    const { botId } = req.body;
 
-        if (!userId) {
-            return res.status(400).json({ message: "User ID is required" });
-        }
-        if(!botId){
-            return res.status(400).json({ message: "Bot ID is required" });
-        }
-
-        const bot = await BotStructureModel.findById(botId);
-        if (!bot) {
-            return res.status(404).json({ message: "Bot not found" });
-        }
-
-        if(bot.userId !== userId){
-            return res.status(403).json({ message: "Forbidden: You don't have permission to restore this bot" });
-        }
-
-        const botConfig = await botConfiguration.findOne({ botId });
-        if(!botConfig)
-            bot.status = transistionBotLifecycle(bot.status as any, "draft");
-        else
-            bot.status = transistionBotLifecycle(bot.status as any, "inactive");
-
-        bot.deleted_at = null;
-        await bot.save();
-
-        return res.status(200).json({ message: "Bot Restored Successfully" });
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
     }
-    catch (e) {
-        console.log(e);
-        return res.status(500).json({ message: "Internal Server Error", e });
+    if (!botId) {
+      return res.status(400).json({ message: "Bot ID is required" });
     }
+
+    const bot = await BotStructureModel.findById(botId) || await ControlledBotModel.findById(botId);
+    let type = null;
+    if (!bot) {
+      return res.status(404).json({ message: "Bot not found" });
+    }
+
+    if((bot as any)?.type === "CONTROLLED"){
+      type = "CONTROLLED";
+    }else 
+    { 
+      type = "FREESTYLE";
+    };
+
+    if (bot.userId !== userId) {
+      return res.status(403).json({ message: "Forbidden: You don't have permission to restore this bot" });
+    }
+
+    
+    const botConfig = await botConfiguration.findOne({ botId });
+    if (!botConfig && type === "FREESTYLE") 
+      bot.status = transistionBotLifecycle(bot.status as any, "draft");
+    else
+      bot.status = transistionBotLifecycle(bot.status as any, "inactive");
+
+    bot.deleted_at = null;
+    await bot.save();
+
+    return res.status(200).json({ message: "Bot Restored Successfully" });
+  }
+  catch (e) {
+    console.log(e);
+    return res.status(500).json({ message: "Internal Server Error", e });
+  }
 }
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -365,54 +417,54 @@ export const restoreDeletedBotController = async (req: Request, res: Response): 
 //-----------------------------------------------------------------------------------------------------------------//
 
 export const permanentlyDeleteBotController = async (req: Request, res: Response): Promise<Response> => {
-    try{
-        const userId = (req as any).user?.userId;
-        const { botId } = req.body;
+  try {
+    const userId = (req as any).user?.userId;
+    const { botId } = req.body;
 
-        if(!userId || !botId){
-            return res.status(400).json({ message: "User ID and bot ID bot are required! But not provided" });
-        }
+    if (!userId || !botId) {
+      return res.status(400).json({ message: "User ID and bot ID bot are required! But not provided" });
+    }
 
-        const bot = await BotStructureModel.findByIdAndDelete(botId);
-        if(!bot){
-            return res.status(404).json({ message: "Bot not found" });
-        }
-        return res.status(200).json({ message: "Bot Permanently Deleted Successfully", bot });
+    let bot = await BotStructureModel.findByIdAndDelete(botId) || await ControlledBotModel.findByIdAndDelete(botId);
+    if (!bot) {
+      return res.status(404).json({ message: "Bot not found" });
     }
-    catch(e){
-        return res.status(500).json({ message: "Internal Server Error", e });
-    }
+    return res.status(200).json({ message: "Bot Permanently Deleted Successfully", bot });
+  }
+  catch (e) {
+    return res.status(500).json({ message: "Internal Server Error", e });
+  }
 
 }
 
 export const getOneBotDetailsController = async (req: Request, res: Response): Promise<Response> => {
-    try{
-        const userId = (req as any).user?.userId;
-        const { botId } = req.params;
+  try {
+    const userId = (req as any).user?.userId;
+    const { botId } = req.params;
 
-        if(!userId || !botId){
-            return res.status(400).json({ message: "User ID and bot ID bot are required! But not provided" });
-        }
-
-        const bot = await BotStructureModel.findById(botId);
-        if(!bot){
-            return res.status(404).json({ message: "Bot not found! It might happen that it was deleted or the ID is incorrect." });
-        }
-
-        const botConfig = await botConfiguration.findOne({ botId });
-        if(!botConfig){
-            return res.status(200).json({ message: "Single Bot Details", bot });
-        }
-
-        if(botConfig.configStatus !== 'setup'){
-            return res.status(405).json({ message : "Bot setup process is already completed! You can configure it now only!", setUpCompleted : true });
-        }
-
-        return res.status(200).json({ message: "Single Bot Details", bot });
+    if (!userId || !botId) {
+      return res.status(400).json({ message: "User ID and bot ID bot are required! But not provided" });
     }
-    catch(e){
-        return res.status(500).json({ message: "Internal Server Error", e });
+
+    let bot = await BotStructureModel.findById(botId) || await ControlledBotModel.findById(botId);
+    if (!bot) {
+      return res.status(404).json({ message: "Bot not found! It might happen that it was deleted or the ID is incorrect." });
     }
+
+    const botConfig = await botConfiguration.findOne({ botId });
+    if (!botConfig) {
+      return res.status(200).json({ message: "Single Bot Details", bot });
+    }
+
+    if (botConfig.configStatus !== 'setup') {
+      return res.status(405).json({ message: "Bot setup process is already completed! You can configure it now only!", setUpCompleted: true });
+    }
+
+    return res.status(200).json({ message: "Single Bot Details", bot });
+  }
+  catch (e) {
+    return res.status(500).json({ message: "Internal Server Error", e });
+  }
 
 }
 
@@ -440,7 +492,7 @@ export const createWebsiteControlledBotController = async (
     }
 
     // Extract bot object from request body
-    const {bot} = req.body;
+    const { bot } = req.body;
 
     // Validate bot structure
     if (!bot || typeof bot !== "object") {

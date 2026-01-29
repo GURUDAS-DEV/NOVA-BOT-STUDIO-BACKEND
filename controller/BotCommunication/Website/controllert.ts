@@ -595,11 +595,13 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                         return res.status(500).json({ message: "API response is invalid or empty." });
                     }
 
+                    console.log("Normalized Results Length:", normalizedResults);
+
                     // Take top 4 results
                     const topFourResults = normalizedResults.slice(0, 4);
                     // Convert API response to options using LLM
                     const generatedOptions = await convertApiResponseToOptions(topFourResults, apiNode?.title || "API Options");
-
+ 
                     if (!generatedOptions || generatedOptions.length === 0) {
                         return res.status(500).json({ message: "Failed to generate options from API response." });
                     }
@@ -1324,6 +1326,7 @@ const convertApiResponseToOptions = async (apiData: any[], contextTitle: string 
             throw new Error("No API data provided");
         }
 
+        // console.log("API Data for Options Conversion:", apiData);
         // Ensure we have at least some data to work with (up to 4 items)
         const dataToProcess = apiData.slice(0, 4);
         const dataCount = dataToProcess.length;
