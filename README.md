@@ -383,46 +383,4 @@ RUN npm run build
 
 FROM node:18-alpine
 WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
-ENV NODE_ENV=production
-EXPOSE 9000
-CMD ["node", "dist/index.js"]
-```
-
-Build & run:
-
-```bash
-docker build -t nova-bot-studio-backend .
-docker run -d -p 9000:9000 --env-file .env nova-bot-studio-backend
-```
-
----  
-
-## Contributing  
-
-We welcome contributions! Please follow these steps:
-
-1. **Fork the repository** and clone your fork.  
-2. **Create a feature branch** (`git checkout -b feat/your-feature`).  
-3. **Install dependencies** (`npm ci`).  
-4. **Make your changes**, ensuring they are covered by tests.  
-5. **Run the test suite** (`npm test`). All tests must pass.  
-6. **Lint & format** (`npm run lint` and `npm run format`).  
-7. **Commit your work** with a clear message and push to your fork.  
-8. **Open a Pull Request** against the `main` branch, describing the changes and any relevant issue numbers.
-
-Happy bot building! 🏫🏫  
-
----  
-
-## License & Credits  
-
-This project is licensed under the **MIT License** – see the [LICENSE](LICENSE) file for details.
-
-**Authors & Maintainers**
-
-* **Gurudas Dev** – Project lead & core maintainer  
-* **Contributors** – See the [contributors graph](https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/graphs/contributors)  
-
----  
+COPY --from=
