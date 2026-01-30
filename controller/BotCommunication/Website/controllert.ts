@@ -408,7 +408,7 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                 name: botDBDetails.name,
                 status: botDBDetails.status,
                 platform: botDBDetails.platform,
-                entryNodeId: botDBDetails.entryNodeId,
+                entryNodeId: (botDBDetails as any).entryNodeId,
             };
 
             await redis.set(redisKeyForBot, JSON.stringify(botDetails), { ex: 86400 });
@@ -578,24 +578,13 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     }
                     const rawJson = await rawResponse.json();
 
-                    // Normalize to an array while keeping as many items as possible
-                    let normalizedResults: any[] = [];
-                    if (Array.isArray(rawJson)) {
-                        normalizedResults = rawJson;
-                    } else if (rawJson && Array.isArray((rawJson as any).samples)) {
-                        // If upstream still sends samples array, use it directly
-                        normalizedResults = (rawJson as any).samples;
-                    } else if (rawJson && typeof rawJson === "object") {
-                        normalizedResults = Object.values(rawJson as Record<string, any>);
-                    } else if (rawJson) {
-                        normalizedResults = [rawJson];
-                    }
-
+                    let sanitizedResponse = sanitizeAPIResponse(rawJson, 4);
+                    let normalizedResults: any[] = sanitizedResponse.samples;
                     if (!normalizedResults || normalizedResults.length === 0) {
                         return res.status(500).json({ message: "API response is invalid or empty." });
                     }
 
-                    console.log("Normalized Results Length:", normalizedResults);
+                    console.log("Normalized Results Length:", normalizedResults.length);
 
                     // Take top 4 results
                     const topFourResults = normalizedResults.slice(0, 4);
@@ -1262,7 +1251,7 @@ const callingConstructApiUponUserInput = async (apiEndpoint: string) => {
         const response = await fetch(apiEndpoint);
         if (response.ok) {
             const data = await response.json();
-            const sanitizedData = sanitizeAPIResponse(data);
+            const sanitizedData = sanitizeAPIResponse(data, 3);
             return sanitizedData.samples || [];
         }
         throw new Error("Failed to fetch data");
@@ -1330,7 +1319,6 @@ const convertApiResponseToOptions = async (apiData: any[], contextTitle: string 
         // Ensure we have at least some data to work with (up to 4 items)
         const dataToProcess = apiData.slice(0, 4);
         const dataCount = dataToProcess.length;
-        console.log(`Converting ${dataCount} API items to options using LLM`);
 
         const openai = new OpenAI({
             apiKey: process.env.API_KEY_FOR_API_CALLING_IN_CONTROLLED_BOT,

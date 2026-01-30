@@ -18,7 +18,8 @@ const BotSchema = new Schema({
 
   entryNodeId: {
     type: Types.ObjectId,
-    required: true
+    required: false,
+    default: null
   },
 
   status: {

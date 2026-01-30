@@ -18,8 +18,10 @@ type SanitizedAPIResult = {
   notes: string[];
 };
 
+let sampleLimit = 2;
+
 const LIMITS = {
-  MAX_SAMPLES: 2,
+  MAX_SAMPLES: sampleLimit,
   MAX_KEYS: 20,
   MAX_STRING_LENGTH: 200,
   MAX_DEPTH: 3
@@ -113,7 +115,7 @@ function computeAggregates(items: any[]): Record<string, any> {
 }
 
 function pickSamples(items: any[]): any[] {
-  if (items.length <= LIMITS.MAX_SAMPLES) {
+  if (items.length <= sampleLimit) {
     return items;
   }
 
@@ -123,12 +125,12 @@ function pickSamples(items: any[]): any[] {
   samples.push(items[Math.floor(items.length / 2)]); // middle
   samples.push(items[items.length - 1]); // last
 
-  while (samples.length < LIMITS.MAX_SAMPLES) {
+  while (samples.length < sampleLimit) {
     const randomIndex = Math.floor(Math.random() * items.length);
     samples.push(items[randomIndex]);
   }
 
-  return samples.slice(0, LIMITS.MAX_SAMPLES);
+  return samples.slice(0, sampleLimit);
 }
 
 function sanitizeObject(obj: any, depth = 0): any {
@@ -139,7 +141,7 @@ function sanitizeObject(obj: any, depth = 0): any {
   }
 
   if (Array.isArray(obj)) {
-    return obj.slice(0, LIMITS.MAX_SAMPLES).map((v) => sanitizeObject(v, depth + 1));
+    return obj.slice(0, sampleLimit).map((v) => sanitizeObject(v, depth + 1));
   }
 
   const sanitized: any = {};
@@ -154,8 +156,9 @@ function sanitizeObject(obj: any, depth = 0): any {
 
 /* ---------------- MAIN ---------------- */
 
-export function sanitizeAPIResponse(apiResponse: JsonValue): SanitizedAPIResult {
+export function sanitizeAPIResponse(apiResponse: JsonValue, sampleLimitFromUser: number ): SanitizedAPIResult {
   const notes: string[] = [];
+  sampleLimit = sampleLimitFromUser;
 
   const { key: primaryKey, array } = findPrimaryArray(apiResponse);
 

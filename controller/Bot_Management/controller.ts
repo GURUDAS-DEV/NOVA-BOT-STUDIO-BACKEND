@@ -3,7 +3,7 @@ import { BotStructureModel } from "../../Models/BotStructure.js";
 import { transistionBotLifecycle } from "../../utils/helper/botLifecycle.js";
 import { botConfiguration } from "../../Models/BotConfiguration.js";
 import { supabase } from "../../Database/postgresql.js";
-import mongoose from "mongoose";
+import mongoose, { type ObjectId } from "mongoose";
 import { ControlledBotModel } from "../../Models/ControlledBotSchema.js";
 import { ControlledBotNodeModel } from "../../Models/ControlledBotNodes.js";
 import { ControlledBotEdgeModel } from "../../Models/ControlledBotEdges.js";
@@ -469,14 +469,82 @@ export const getOneBotDetailsController = async (req: Request, res: Response): P
 }
 
 
+
+export const createWebsiteControlledBot = async (req: Request, res: Response): Promise<Response> => {
+  try{
+    const { userId, name, platform } = req.body;
+
+    if(!userId || !name || !platform){
+      return res.status(400).json({ message : "Required fields are missing"});
+    }
+
+    const insertBotData = await ControlledBotModel.create({
+      userId,
+      name,
+      platform,
+      type : "CONTROLLED",
+      entryNodeId : null,
+      status : "draft",
+    });
+
+    await insertBotData.save();
+
+
+    return res.status(200).json({ message : "Create Website Controlled Bot! ", botId : insertBotData._id });
+  }
+catch(e){
+  return res.status(500).json({ message : "Internal Server Error!", e });
+}
+}
+
+
+export const getOneControlledBotDetailsController = async (req: Request, res: Response): Promise<Response> => {
+  try{
+
+    const userId = (req as any).user?.userId;
+    const { botId }  = req.params;
+    
+    if(!userId || !botId){
+      return res.status(400).json({ message : "User ID and Bot ID are required."});
+    }
+
+    // Validate if botId is a valid MongoDB ObjectId before converting
+    if (!mongoose.isValidObjectId(botId)) {
+      console.log("Invalid Bot ID format:", botId);
+      return res.status(404).json({ message: "Invalid Bot ID format" });
+    }
+
+    const _id = new mongoose.Types.ObjectId(botId);
+
+    const botDetails = await ControlledBotModel.findOne({ _id, userId });
+    if(!botDetails){
+      return res.status(404).json({ message : "Controlled Bot not found."});
+    }
+
+    if(botDetails.entryNodeId !== null)
+      return res.status(400).json({ message : "Bot is already being setup! If you want you can configure it, but can't create a new with current bot Id ", botDetails });
+
+    return res.status(200).json({ message : "Bot Founded successfully", botDetails });
+  } 
+  catch(e){
+    console.log(e);
+    return res.status(500).json({ message : "Internal Server Error!", e });
+  }
+
+}
+
+
 ///-----------------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------//
-//----------------------------------Creating website Controlled Style botDescription----------------------------------//
+//---------------- Configure Existing Website Controlled Bot (Add Nodes & Edges) ------------------//
 //-----------------------------------------------------------------------------------------------------------------//
 //-----------------------------------------------------------------------------------------------------------------//
 
-
-export const createWebsiteControlledBotController = async (
+/**
+ * Adds nodes and edges configuration to an existing controlled bot
+ * Flow: Bot is already created by createWebsiteControlledBot, now we add nodes/edges
+ */
+export const createWebsiteControlledStyleBotConfig = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
@@ -484,15 +552,20 @@ export const createWebsiteControlledBotController = async (
   session.startTransaction();
 
   try {
-    // Extract authenticated user ID
+    // Step 1: Extract authenticated user ID
     const userId = (req as any).user?.userId;
     if (!userId) {
       await session.abortTransaction();
       return res.status(401).json({ message: "Unauthorized: User ID is required" });
     }
 
-    // Extract bot object from request body
-    const { bot } = req.body;
+    // Step 2: Extract botId and bot object from request body
+    const { botId, bot } = req.body;
+
+    if (!botId) {
+      await session.abortTransaction();
+      return res.status(400).json({ message: "Bot ID is required" });
+    }
 
     // Validate bot structure
     if (!bot || typeof bot !== "object") {
@@ -500,23 +573,30 @@ export const createWebsiteControlledBotController = async (
       return res.status(400).json({ message: "Bot data is required" });
     }
 
-    if (!bot.name || typeof bot.name !== "string") {
-      await session.abortTransaction();
-      return res.status(400).json({ message: "Bot name is required" });
-    }
-
     if (!Array.isArray(bot.nodes) || bot.nodes.length === 0) {
       await session.abortTransaction();
       return res.status(400).json({ message: "At least one node is required" });
     }
 
-    // Step 1: Build tempId → MongoDB ObjectId mapping for all nodes
+    // Step 3: Verify the bot exists and belongs to the authenticated user
+    const existingBot = await ControlledBotModel.findById(botId).session(session);
+    if (!existingBot) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: "Bot not found" });
+    }
+
+    if (existingBot.userId.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({ message: "Forbidden: You don't have permission to configure this bot" });
+    }
+
+    // Step 4: Build tempId → MongoDB ObjectId mapping for all nodes
     const tempIdToObjectId: Record<string, mongoose.Types.ObjectId> = {};
     bot.nodes.forEach((node: any) => {
       tempIdToObjectId[node.id] = new mongoose.Types.ObjectId();
     });
 
-    // Step 2: Determine entry node (first node by default)
+    // Step 5: Determine entry node (first node by default) and update bot
     const entryNodeTempId = bot.nodes[0]?.id;
     if (!entryNodeTempId) {
       await session.abortTransaction();
@@ -525,23 +605,17 @@ export const createWebsiteControlledBotController = async (
 
     const entryNodeObjectId = tempIdToObjectId[entryNodeTempId];
 
-    // Step 3: Create ControlledBot document
-    const controlledBot = new ControlledBotModel({
-      name: bot.name,
-      userId: userId,
-      type: "CONTROLLED",
-      status: "inactive",
-      entryNodeId: entryNodeObjectId,
-    });
+    // Update bot's entry node if it's still null
+    if (!existingBot.entryNodeId) {
+      (existingBot as any).entryNodeId = entryNodeObjectId;
+      await existingBot.save({ session });
+    }
 
-    const savedBot = await controlledBot.save({ session });
-    const botId = savedBot._id;
-
-    // Step 4: Transform and insert nodes
+    // Step 6: Transform and insert nodes
     const nodeDocuments = bot.nodes.map((node: any) => {
       const nodeDoc: any = {
         _id: tempIdToObjectId[node.id],
-        botId,
+        botId: existingBot._id,
         title: node.title || "",
         message: node.message || "",
         executor: "none",
@@ -610,7 +684,7 @@ export const createWebsiteControlledBotController = async (
 
     await ControlledBotNodeModel.insertMany(nodeDocuments, { session });
 
-    // Step 5: Extract and insert edges from node options
+    // Step 7: Extract and insert edges from node options
     const edgeSet = new Map<string, any>();
 
     bot.nodes.forEach((node: any) => {
@@ -627,7 +701,7 @@ export const createWebsiteControlledBotController = async (
             if (fromNodeId && toNodeId) {
               const key = `${fromNodeId}-${toNodeId}-${optionIndex}`;
               edgeSet.set(key, {
-                botId,
+                botId: existingBot._id,
                 fromNodeId,
                 toNodeId,
                 intent: option.label || `Option ${optionIndex + 1}`,
@@ -646,7 +720,7 @@ export const createWebsiteControlledBotController = async (
         if (fromNodeId && toNodeId) {
           const key = `${fromNodeId}-${toNodeId}-input`;
           edgeSet.set(key, {
-            botId,
+            botId: existingBot._id,
             fromNodeId,
             toNodeId,
             intent: "User Input",
@@ -663,7 +737,7 @@ export const createWebsiteControlledBotController = async (
         if (fromNodeId && toNodeId) {
           const key = `${fromNodeId}-${toNodeId}-api`;
           edgeSet.set(key, {
-            botId,
+            botId: existingBot._id,
             fromNodeId,
             toNodeId,
             intent: "API Response",
@@ -679,27 +753,27 @@ export const createWebsiteControlledBotController = async (
       await ControlledBotEdgeModel.insertMany(edgeDocuments, { session });
     }
 
-    // Step 6: Commit transaction
+    // Step 8: Commit transaction
     await session.commitTransaction();
 
-    return res.status(201).json({
-      message: "Controlled bot created successfully",
+    return res.status(200).json({
+      message: "Bot configuration completed successfully",
       data: {
-        botId: savedBot._id,
-        name: savedBot.name,
-        type: savedBot.type,
-        status: savedBot.status,
-        entryNodeId: savedBot.entryNodeId,
-        nodesCreated: bot.nodes.length,
-        edgesCreated: edgeSet.size,
+        botId: existingBot._id,
+        name: existingBot.name,
+        type: existingBot.type,
+        status: existingBot.status,
+        entryNodeId: existingBot.entryNodeId,
+        nodesAdded: nodeDocuments.length,
+        edgesAdded: edgeSet.size,
       },
     });
   } catch (error) {
     await session.abortTransaction();
-    console.error("Error creating controlled bot:", error);
+    console.error("Error configuring controlled bot:", error);
 
     return res.status(500).json({
-      message: "Failed to create controlled bot",
+      message: "Failed to configure controlled bot",
       error: error instanceof Error ? error.message : "Unknown error",
     });
   } finally {

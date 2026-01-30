@@ -91,7 +91,7 @@ export const testUserGivenApiController = async (req: Request, res: Response): P
                 return res.status(400).json({ message: "API Endpoint did not return valid JSON!" });
             }
 
-            const result = sanitizeAPIResponse(data);
+            const result = sanitizeAPIResponse(data, 2);
             if (!result) {
                 return res.status(400).json({ message: "API Response could not be sanitized!" });
             }

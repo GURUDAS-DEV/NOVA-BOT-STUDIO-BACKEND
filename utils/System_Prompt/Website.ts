@@ -119,7 +119,7 @@ export const fetchData = async (url: string) => {
       message: data?.message || 'Error while fetching data from external source'
     };
   }
-  const sanitizedData = sanitizeAPIResponse(data);
+  const sanitizedData = sanitizeAPIResponse(data, 2);
 
   return sanitizedData.samples;
 };
