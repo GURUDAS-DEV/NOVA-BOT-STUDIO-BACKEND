@@ -17,6 +17,7 @@ NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for buildin
 * **Bot analytics** – collect, store, and query usage metrics per bot.  
 * **Multi‑database support** – PostgreSQL for relational data, MongoDB for flexible storage.  
 * **Redis integration** – fast look‑ups for API‑key validation, session data, and real‑time website‑bot communication.  
+* **Controlled bots** – lightweight, website‑hosted bots with a dedicated schema and management endpoints.  
 
 Targeted at developers building SaaS bot platforms, internal automation tools, or any service that needs programmable bots with fine‑grained access control and insight into bot performance.  
 
@@ -32,6 +33,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **AI Feature Management** | Toggle AI modules (e.g., text‑enhancer, validator) per bot. | ✅ Stable |
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
 | **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. | ✅ Stable |
+| **Controlled Bot Management** | Create lightweight “website‑controlled” bots, configure style, and retrieve details via dedicated routes. | ✅ Stable |
 | **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats. | ✅ Stable |
 | **Multi‑DB Support** | PostgreSQL (`pg`) & MongoDB (`mongoose`). | ✅ Stable |
 | **Redis Caching** | Centralised client for API‑key validation, session storage, and bot messaging. | ✅ Stable |
@@ -86,6 +88,10 @@ src/
 │   │   └─ Website/
 │   └─ Testing/
 ├─ Models/                # Mongoose / TypeORM schemas
+│   ├─ BotStructure.ts
+│   ├─ BotConfiguration.ts
+│   ├─ ControlledBotSchema.ts   ← **new schema for website‑controlled bots**
+│   └─ … (other models)
 ├─ utils/
 │   ├─ JWT/               # Token generation & validation
 │   ├─ System_Prompt/     # Prompt‑related helpers
@@ -101,6 +107,7 @@ src/
 * **Express** routes delegate to controllers, which interact with the data layer (PostgreSQL, MongoDB) and auxiliary services (Redis, JWT).  
 * **Redis** is used as a fast cache for API‑key look‑ups, session storage, and real‑time bot messaging.  
 * **JWT** tokens are signed with separate secrets for access and refresh tokens, enabling short‑lived access tokens and long‑lived refresh tokens stored in HTTP‑only cookies.  
+* **ControlledBotModel** stores lightweight bots that run entirely on the website layer; the new `platform` field (default `Website`) and status lifecycle are part of the schema.
 
 ---  
 
@@ -232,11 +239,18 @@ await axios.get('http://localhost:9000/api/bot/', {
 });
 ```
 
-### Retrieve a Bot Configuration  
+### Create a **controlled website bot**
 
 ```typescript
-await axios.get(
-  'http://localhost:9000/api/botConfig/getConfig/12345',
+await axios.post(
+  'http://localhost:9000/api/bot/createControlledBot',
+  {
+    name: 'SupportBot',
+    userId: '64a1f2c9e5b6c8d1f0a2b3c4',
+    platform: 'Website',          // optional – defaults to Website
+    type: 'CONTROLLED',
+    // optional entryNodeId can be omitted for a fresh bot
+  },
   {
     headers: { Cookie: `refreshToken=${refreshToken}` },
     withCredentials: true,
@@ -244,16 +258,31 @@ await axios.get(
 );
 ```
 
-### Fetch Bot Analytics  
+### Configure website‑controlled bot style  
 
 ```typescript
-await axios.get(
-  'http://localhost:9000/api/botAnalytics/summary/12345',
+await axios.post(
+  'http://localhost:9000/api/bot/setupWebsiteControlledStyleBotConfig',
+  {
+    botId: '64b2e3d4f6a7c9e0b1c2d3e4',
+    style: {
+      theme: 'light',
+      bubbleColor: '#007bff',
+      // any other UI‑related settings
+    },
+  },
   {
     headers: { Cookie: `refreshToken=${refreshToken}` },
     withCredentials: true,
   }
 );
+```
+
+### Retrieve a controlled bot by ID  
+
+```bash
+GET http://localhost:9000/api/bot/getControlledBotById/64b2e3d4f6a7c9e0b1c2d3e4
+Cookie: refreshToken=<yourRefreshToken>
 ```
 
 ### Website Bot Communication (real‑time)  
@@ -263,7 +292,7 @@ POST http://localhost:9000/websiteBot/message
 Content-Type: application/json
 
 {
-  "botId": "12345",
+  "botId": "64b2e3d4f6a7c9e0b1c2d3e4",
   "userMessage": "Hello!"
 }
 ```
@@ -298,89 +327,73 @@ The response contains the raw API key (shown only once) and its hashed represent
 
 > **Base URL:** `http://<host>:<port>/api/`  
 
-| Category | Method | Endpoint | Description |
-|----------|--------|----------|-------------|
-| **Auth** | `POST` | `/auth/register` | Register a new user |
-| | `POST` | `/auth/login` | Login and receive JWT cookies |
-| | `POST` | `/auth/refresh-token` | Refresh access token |
-| **API‑Key** | `POST` | `/APIKeyManagement` | Generate a new API key (protected) |
-| | `GET` | `/APIKeyManagement` | List all API keys for the caller |
-| | `DELETE` | `/APIKeyManagement/:id` | Revoke an API key |
-| **Bot Config** | `POST` | `/botConfig/` | Create bot configuration |
-| | `GET` | `/botConfig/` | List bot configurations |
-| | `GET` | `/botConfig/getConfig/:botId` | Fetch a specific bot’s configuration (protected) |
-| | `PUT` | `/botConfig/:id` | Update a bot configuration |
-| | `DELETE` | `/botConfig/:id` | Delete a bot configuration |
-| **Bot Management** | `GET` | `/bot/` | Retrieve bots owned by the authenticated user |
-| | `POST` | `/bot/` | Deploy a new bot instance |
-| | `DELETE` | `/bot/:id` | Remove a bot |
-| **AI Feature Management** | `PATCH` | `/aiFeatures/:botId` | Enable/disable AI modules for a bot |
-| **Advanced Bot Management** | `POST` | `/advanceBotController/start` | Start a bot with advanced lifecycle options |
-| | `POST` | `/advanceBotController/stop` | Stop a running bot |
-| **Website Bot** | `POST` | `/websiteBot/message` | Send a message to a website‑embedded bot and receive a reply |
-| | `GET` | `/websiteBot/status/:botId` | Get current status of the website bot |
-| **Bot Analytics** | `GET` | `/botAnalytics/summary/:botId` | Retrieve aggregated usage stats for a bot |
-| | `GET` | `/botAnalytics/events/:botId` | List raw analytics events (protected) |
-| **Testing** | `GET` | `/testing/ping` | Simple health check for test environment |
+### Auth  
 
-### Authentication  
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/auth/register` | Register a new user |
+| `POST` | `/auth/login` | Login and receive JWT cookies |
+| `POST` | `/auth/refresh-token` | Refresh access token |
 
-All routes under `/api/` (except `/auth/*`) require a valid `refreshToken` cookie. The `authMiddleware` validates the JWT, attaches `req.user`, and enforces role‑based access when configured.
+### API‑Key  
 
-### Error format  
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/APIKeyManagement` | Generate a new API key (protected) |
+| `GET`  | `/APIKeyManagement` | List all API keys for the caller |
+| `DELETE` | `/APIKeyManagement/:id` | Revoke an API key |
 
-```json
-{
-  "error": "InvalidCredentials",
-  "message": "Email or password is incorrect",
-  "statusCode": 401
-}
-```
+### Bot Configuration  
 
----  
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/botConfig/` | Create bot configuration |
+| `GET`  | `/botConfig/` | List bot configurations |
+| `GET`  | `/botConfig/getConfig/:botId` | Fetch a specific bot’s configuration (protected) |
+| `PUT`  | `/botConfig/:id` | Update a bot configuration |
+| `DELETE`| `/botConfig/:id` | Delete a bot configuration |
 
-## Development  
+### Bot Management  
 
-### Setup  
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET`  | `/bot/` | Retrieve bots owned by the authenticated user |
+| `POST` | `/bot/` | Deploy a new bot instance |
+| `DELETE`| `/bot/:id` | Remove a bot |
+| `POST` | `/bot/createControlledBot` | **Create a website‑controlled bot** |
+| `POST` | `/bot/setupWebsiteControlledStyleBotConfig` | **Configure style for a website‑controlled bot** |
+| `GET`  | `/bot/getControlledBotById/:botId` | **Fetch details of a controlled bot** |
+| `GET`  | `/bot/getBotDetailsForHomePage` | Get summary data for the home‑page UI |
+| `GET`  | `/bot/getAllBotsForManagePage` | List all bots (including controlled) for management UI |
+| `GET`  | `/bot/getOneBotDetails/:botId` | Get full details of a regular bot |
+| `DELETE`| `/bot/deleteBot` | Soft‑delete a bot |
+| `GET`  | `/bot/getDeletedBots` | List soft‑deleted bots |
+| `POST` | `/bot/recoverBot` | Restore a soft‑deleted bot |
+| `DELETE`| `/bot/permanentlyDeleteBot` | Permanently remove a bot |
 
-```bash
-npm run dev   # starts ts-node-dev with hot reload
-```
+### AI Feature Management  
 
-### Testing  
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `PATCH` | `/aiFeatures/:botId` | Enable/disable AI modules for a bot |
 
-```bash
-npm test
-```
+### Advanced Bot Management  
 
-### Linting & Formatting  
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/advanceBotController/start` | Start a bot with advanced lifecycle options |
+| `POST` | `/advanceBotController/stop` | Stop a running bot |
 
-```bash
-npm run lint          # ESLint
-npm run format        # Prettier
-```
+### Website Bot  
 
-### Debugging Tips  
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/websiteBot/message` | Send a message to a website‑embedded bot and receive a reply |
+| `GET`  | `/websiteBot/status/:botId` | Get current status of the website bot |
 
-* Enable request logging: `DEBUG=express:* npm run dev`.  
-* Inspect Redis keys with `redis-cli` (e.g., `KEYS apiKey:*` or `KEYS websiteBot:*`).  
-* Use VS Code’s “Attach to Node Process” for step‑through debugging of TypeScript sources.  
+### Bot Analytics  
 
----  
-
-## Deployment  
-
-### Docker (production)  
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY . .
-RUN npm run build
-
-FROM node:18-alpine
-WORKDIR /app
-COPY --from=
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/botAnalytics/summary/:botId` | Retrieve aggregated usage stats for a bot |
+| `
