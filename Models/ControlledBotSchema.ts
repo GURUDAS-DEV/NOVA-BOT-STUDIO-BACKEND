@@ -15,7 +15,12 @@ const BotSchema = new Schema({
     required: true,
     default : 'Website'
   },
-
+  currentState : {
+    type: String,
+    enum: ['setup', 'configure'],
+    default: 'setup',
+    required: true
+  },
   entryNodeId: {
     type: Types.ObjectId,
     required: false,
@@ -30,7 +35,7 @@ const BotSchema = new Schema({
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
-  deletedAt: { type: Date , default: null },
+  deleted_at: { type: Date , default: null },
 });
 
 export const ControlledBotModel = model("ControlledBot", BotSchema);

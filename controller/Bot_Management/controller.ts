@@ -32,6 +32,7 @@ export const createBotController = async (req: Request, res: Response): Promise<
       platform,
       style,
       status: "draft",
+      currentState : "setup",
     })
     if (!createdBot) {
       return res.status(400).json({ message: "Failed to create bot" });
@@ -485,6 +486,7 @@ export const createWebsiteControlledBot = async (req: Request, res: Response): P
       type : "CONTROLLED",
       entryNodeId : null,
       status : "draft",
+      currentState : "setup",
     });
 
     await insertBotData.save();
@@ -752,6 +754,12 @@ export const createWebsiteControlledStyleBotConfig = async (
       const edgeDocuments = Array.from(edgeSet.values());
       await ControlledBotEdgeModel.insertMany(edgeDocuments, { session });
     }
+
+    await ControlledBotModel.updateOne(
+      { _id: existingBot._id },
+      { currentState: "configure" },
+      { session }
+    );
 
     // Step 8: Commit transaction
     await session.commitTransaction();

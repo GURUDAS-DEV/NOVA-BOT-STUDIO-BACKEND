@@ -61,6 +61,7 @@ export const setConfigController = async (req: Request, res: Response): Promise<
         }
 
         bot.status = 'inactive';
+        bot.currentState = 'configure';
         await bot.save();
 
         return res.status(200).json({ message: "Bot is being successfully set!" });

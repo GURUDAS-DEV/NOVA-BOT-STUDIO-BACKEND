@@ -23,6 +23,12 @@ const botStructureSchema = new Schema<BotStructureType>({
         enum: ['WhatsApp', 'Telegram', 'Discord', 'Instagram', 'Website'],
         required: true,
     },
+    currentState : {
+        type: String,
+        enum: ['setup', 'configure'],
+        default: 'setup',
+        required: true
+    },
     style: {
         type: String,
         required: true,
