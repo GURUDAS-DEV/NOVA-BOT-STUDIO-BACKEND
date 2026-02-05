@@ -788,3 +788,48 @@ export const createWebsiteControlledStyleBotConfig = async (
     await session.endSession();
   }
 };
+
+
+///-----------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------Create bot type Controller----------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------------------------------------------------------//
+
+export const detectBotTypeController = async(req : Request, res : Response) : Promise<Response> =>{
+  try{
+    const {apiKey} = req.body;
+
+    if(!apiKey){
+      return res.status(400).json({ message : "API Key is required!"});
+    } 
+
+    console.log("API Key : " + apiKey)
+    const { data, error } = await supabase
+      .from("API_KEY")
+      .select("botId, isRevoked")
+      .eq("HashedApiKey", apiKey)
+      .eq("isRevoked", false)
+      .single();
+      console.log("Supabase response for API Key lookup:", { data, error });
+
+      if(error || !data){
+        return res.status(404).json({ message : "Valid API Key not found!"});
+      }
+
+      const botId = data.botId;
+      
+      let bot = await BotStructureModel.findById(botId);
+      if(bot){
+        return res.status(200).json({ message : "FREESTYLE" });
+      }
+      bot = await ControlledBotModel.findById(botId);
+      if(bot){
+        return res.status(200).json({ message : "CONTROLLED" });
+      }
+      return res.status(404).json({ message : "Bot not found for the provided API Key!"});
+  }
+  catch(e){
+    return res.status(500).json({ message : "Internal Server Error!", e });
+  }
+}
