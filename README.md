@@ -90,7 +90,7 @@ src/
 ├─ Models/                # Mongoose / TypeORM schemas
 │   ├─ BotStructure.ts
 │   ├─ BotConfiguration.ts
-│   ├─ ControlledBotSchema.ts   ← **new schema for website‑controlled bots**
+│   ├─ ControlledBotSchema.ts   ← new schema for website‑controlled bots
 │   └─ … (other models)
 ├─ utils/
 │   ├─ JWT/               # Token generation & validation
@@ -382,18 +382,4 @@ The response contains the raw API key (shown only once) and its hashed represent
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/advanceBotController/start` | Start a bot with advanced lifecycle options |
-| `POST` | `/advanceBotController/stop` | Stop a running bot |
-
-### Website Bot  
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/websiteBot/message` | Send a message to a website‑embedded bot and receive a reply |
-| `GET`  | `/websiteBot/status/:botId` | Get current status of the website bot |
-
-### Bot Analytics  
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/botAnalytics/summary/:botId` | Retrieve aggregated usage stats for a bot |
-| `
+| `POST` | `/advanceBotController/
