@@ -79,7 +79,7 @@ src/
 ├─ Router/                # Express routers – one per domain
 │   ├─ Authentication/
 │   ├─ API_Key_Management/
-│   ├─ Bot_Management/
+│   ├─ Bot__Management/
 │   ├─ Bot_Configration/
 │   ├─ AI_Feature_Management/
 │   ├─ Advance_Bot_Management/
@@ -281,105 +281,4 @@ await axios.post(
 ### Retrieve a controlled bot by ID  
 
 ```bash
-GET http://localhost:9000/api/bot/getControlledBotById/64b2e3d4f6a7c9e0b1c2d3e4
-Cookie: refreshToken=<yourRefreshToken>
-```
-
-### Website Bot Communication (real‑time)  
-
-```bash
-POST http://localhost:9000/websiteBot/message
-Content-Type: application/json
-
-{
-  "botId": "64b2e3d4f6a7c9e0b1c2d3e4",
-  "userMessage": "Hello!"
-}
-```
-
-**Response (example)**
-
-```json
-{
-  "reply": "Hi there! How can I assist you today?",
-  "status": "success"
-}
-```
-
-### Generate an API Key (protected)  
-
-```typescript
-await axios.post(
-  'http://localhost:9000/api/APIKeyManagement',
-  { name: 'My Service' },
-  {
-    headers: { Cookie: `refreshToken=${refreshToken}` },
-    withCredentials: true,
-  }
-);
-```
-
-The response contains the raw API key (shown only once) and its hashed representation stored in Redis.
-
----  
-
-## API Documentation  
-
-> **Base URL:** `http://<host>:<port>/api/`  
-
-### Auth  
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/auth/register` | Register a new user |
-| `POST` | `/auth/login` | Login and receive JWT cookies |
-| `POST` | `/auth/refresh-token` | Refresh access token |
-
-### API‑Key  
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/APIKeyManagement` | Generate a new API key (protected) |
-| `GET`  | `/APIKeyManagement` | List all API keys for the caller |
-| `DELETE` | `/APIKeyManagement/:id` | Revoke an API key |
-
-### Bot Configuration  
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/botConfig/` | Create bot configuration |
-| `GET`  | `/botConfig/` | List bot configurations |
-| `GET`  | `/botConfig/getConfig/:botId` | Fetch a specific bot’s configuration (protected) |
-| `PUT`  | `/botConfig/:id` | Update a bot configuration |
-| `DELETE`| `/botConfig/:id` | Delete a bot configuration |
-
-### Bot Management  
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET`  | `/bot/` | Retrieve bots owned by the authenticated user |
-| `POST` | `/bot/` | Deploy a new bot instance |
-| `DELETE`| `/bot/:id` | Remove a bot |
-| `POST` | `/bot/createControlledBot` | **Create a website‑controlled bot** |
-| `POST` | `/bot/setupWebsiteControlledStyleBotConfig` | **Configure style for a website‑controlled bot** |
-| `GET`  | `/bot/getControlledBotById/:botId` | **Fetch details of a controlled bot** |
-| `GET`  | `/bot/getBotDetailsForHomePage` | Get summary data for the home‑page UI |
-| `GET`  | `/bot/getAllBotsForManagePage` | List all bots (including controlled) for management UI |
-| `GET`  | `/bot/getOneBotDetails/:botId` | Get full details of a regular bot |
-| `DELETE`| `/bot/deleteBot` | Soft‑delete a bot |
-| `GET`  | `/bot/getDeletedBots` | List soft‑deleted bots |
-| `POST` | `/bot/recoverBot` | Restore a soft‑deleted bot |
-| `DELETE`| `/bot/permanentlyDeleteBot` | Permanently remove a bot |
-
-### AI Feature Management  
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `PATCH` | `/aiFeatures/:botId` | Enable/disable AI modules for a bot |
-
-### Advanced Bot Management  
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/advanceBotController/start` | Start a bot with advanced lifecycle options |
-| `POST` | `/advanceBotController/
+GET http://localhost:9000/api/bot/getControlledBotById/64b2e3d4f6a7c9e0b1c2
