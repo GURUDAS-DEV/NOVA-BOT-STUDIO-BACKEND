@@ -8,6 +8,7 @@ import { ControlledBotModel } from "../../Models/ControlledBotSchema.js";
 import { ControlledBotNodeModel } from "../../Models/ControlledBotNodes.js";
 import { ControlledBotEdgeModel } from "../../Models/ControlledBotEdges.js";
 import { platform } from "os";
+import { hashApiKey } from "../../utils/helper/APIKeyHashing.js";
 
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -21,6 +22,7 @@ export const createBotController = async (req: Request, res: Response): Promise<
     const { userId, botName, botDescription, botAvatar, platform, style } = req.body;
 
     if (!userId || !botName || !platform || !style) {
+      
       return res.status(400).json({ message: "Required fields are missing" });
     }
 
@@ -476,6 +478,7 @@ export const createWebsiteControlledBot = async (req: Request, res: Response): P
     const { userId, name, platform } = req.body;
 
     if(!userId || !name || !platform){
+      console.log("Missing required fields:", { userId, name, platform });
       return res.status(400).json({ message : "Required fields are missing"});
     }
 
@@ -757,7 +760,7 @@ export const createWebsiteControlledStyleBotConfig = async (
 
     await ControlledBotModel.updateOne(
       { _id: existingBot._id },
-      { currentState: "configure" },
+      { currentState: "configure", status: "inactive" },
       { session }
     );
 
@@ -804,11 +807,11 @@ export const detectBotTypeController = async(req : Request, res : Response) : Pr
       return res.status(400).json({ message : "API Key is required!"});
     } 
 
-    console.log("API Key : " + apiKey)
+    const hashedApiKey = hashApiKey(apiKey);
     const { data, error } = await supabase
       .from("API_KEY")
       .select("botId, isRevoked")
-      .eq("HashedApiKey", apiKey)
+      .eq("HashedApiKey", hashedApiKey)
       .eq("isRevoked", false)
       .single();
       console.log("Supabase response for API Key lookup:", { data, error });
@@ -821,11 +824,11 @@ export const detectBotTypeController = async(req : Request, res : Response) : Pr
       
       let bot = await BotStructureModel.findById(botId);
       if(bot){
-        return res.status(200).json({ message : "FREESTYLE" });
+        return res.status(200).json({ botType : "freestyle" });
       }
       bot = await ControlledBotModel.findById(botId);
       if(bot){
-        return res.status(200).json({ message : "CONTROLLED" });
+        return res.status(200).json({ botType : "controlled" });
       }
       return res.status(404).json({ message : "Bot not found for the provided API Key!"});
   }
