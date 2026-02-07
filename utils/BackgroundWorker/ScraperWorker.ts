@@ -54,8 +54,9 @@ const bootstrapWorker = async (): Promise<void> => {
                 // 5) generating embedding
                 const embeddings = await generateEmbeddings(chunks);
 
-                //6) store embedding
+                //6) store embedding with botId for RAG filtering
                 const { data, error } = await supabase.from("embeddingstorage").insert({
+                    botId: botId,
                     content: chunks,
                     embedding: embeddings, // must be number[]
                 });

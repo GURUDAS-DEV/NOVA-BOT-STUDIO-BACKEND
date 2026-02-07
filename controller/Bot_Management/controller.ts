@@ -843,13 +843,17 @@ export const scrapWebsiteForBotController = async(req : Request, res : Response)
     console.log("Received request ");
     const { url, botId } = req.body;
     const userId = (req as any).user?.userId;
-    console.log("Received request to scrape website with data:", { url, botId, userId });
     
     if(!url || !botId){
       return res.status(400).json({ message : "URL and BotId is required!"});
     }
     if(!userId){
       return res.status(400).json({ message : "User ID is required!"});
+    }
+
+    const existingScrapeStatus = await BotStructureModel.findOne({ _id: botId, userId }, { "scrapeStatus": 1 });
+    if(existingScrapeStatus?.scrapeStatus === "running" || existingScrapeStatus?.scrapeStatus === "completed"){
+      return res.status(400).json({ message : "Scraping is already running or has been completed for this bot!"});
     }
 
     await scrapeQueue.add('scrapeWebsite', { url, userId, botId }, {

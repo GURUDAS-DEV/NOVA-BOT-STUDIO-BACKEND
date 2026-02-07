@@ -15,13 +15,14 @@ export const getConfigController = async (req: Request, res: Response): Promise<
         if(!userId || !botId){
             return res.status(400).json({ message : "User ID and Bot ID are required."});
         }
-
+ 
         const botConfig = await botConfiguration.findOne({botId : botId.toString()});
+        const scrapeStatus = await BotStructureModel.findById(botId, { scrapeStatus: 1 });
         if(!botConfig){
             return res.status(404).json({ message : "Bot Configuration not found."});
         }
 
-        return res.status(200).json({ message : "Bot Configuration fetched successfully.", botConfig });
+        return res.status(200).json({ message : "Bot Configuration fetched successfully.", config : botConfig, scrapeStatus : scrapeStatus?.scrapeStatus || "setup" });
     }
     catch(e){
         return res.status(500).json({ message : "Internal Server Error!" });

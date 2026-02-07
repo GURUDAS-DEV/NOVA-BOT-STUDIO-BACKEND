@@ -14,7 +14,6 @@ interface ACCESS_PAYLOAD {
 
 export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     const { refreshToken, accessToken, sessionId } = req.cookies;
-    console.log("Auth Middleware - Cookies:", { refreshToken, accessToken, sessionId });
     if (!sessionId || !refreshToken) {
         return res.status(401).json({ message: "Unauthorized: No session ID provided" });
     }

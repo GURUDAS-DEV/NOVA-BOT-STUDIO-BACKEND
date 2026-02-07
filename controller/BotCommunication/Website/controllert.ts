@@ -13,6 +13,7 @@ import { ControlledBotEdgeModel } from "../../../Models/ControlledBotEdges.js";
 import { apiConstructorSystemPrompt } from "../../../utils/System_Prompt/ApiConstructor.js";
 import { sanitizeAPIResponse } from "../../../utils/helper/SantizingApi.js";
 import { summarizingApiResultSystemPrompt } from "../../../utils/System_Prompt/summarizingApiResult.js";
+import { supabase } from "../../../Database/postgresql.js";
 
 //----------------------------------------------------------------------------------------------------------------//
 //----------------------------------------------------------------------------------------------------------------//
@@ -67,6 +68,63 @@ const getFromRedisStringOnly = async (redisKey: string): Promise<any> => {
     }
     catch (e) {
         console.error("Error in getFromRedisStringOnly:", e);
+        return null;
+    }
+};
+
+/**
+ * RAG Pipeline Helper - Retrieves relevant documents from Supabase pgvector
+ * Token-optimized: fetches top 3 docs, truncates to ~400 chars each
+ */
+const retrieveRAGContext = async (botId: string, userQuery: string, topK: number = 3): Promise<string | null> => {
+    try {
+        // Generate embedding for user query using Gemini embedding model
+        const embeddingClient = new OpenAI({
+            apiKey: process.env.GEMINI_API_KEY,
+            baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+        });
+
+        const embeddingResponse = await embeddingClient.embeddings.create({
+            model: "gemini-embedding-001",
+            input: userQuery.trim(),
+        });
+
+        if (!embeddingResponse.data?.[0]?.embedding) {
+            console.warn("RAG: Failed to generate query embedding");
+            return null;
+        }
+
+        const queryEmbedding = embeddingResponse.data[0].embedding;
+
+        // Query Supabase for similar documents using pgvector
+        // Table: embeddingstorage (id, content, embedding)
+        const { data: documents, error } = await supabase.rpc('match_documents', {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.5,
+            match_count: topK,
+            filter_bot_id: botId
+        });
+
+        if (error) {
+            console.warn("RAG: Supabase query error:", error.message);
+            return null;
+        }
+
+        if (!documents || documents.length === 0) {
+            return null;
+        }
+
+        // Token optimization: truncate each doc to ~400 chars
+        const contextChunks = documents.map((doc: { content: string }, idx: number) => {
+            const truncatedContent = doc.content.length > 400 
+                ? doc.content.substring(0, 400) + "..." 
+                : doc.content;
+            return `[${idx + 1}] ${truncatedContent}`;
+        });
+
+        return contextChunks.join("\n\n");
+    } catch (err) {
+        console.warn("RAG: Retrieval failed:", err);
         return null;
     }
 };
@@ -190,7 +248,7 @@ export const freestyleWebsiteBotController = async (req: Request, res: Response)
 
 
         const botDetails = await getFromRedisStringOnly(`WebsiteBotDetails:${botId}`);
-        let botStatus = null, botConfig = null, botName = "CuteBot";
+        let botStatus = null, botConfig = null, botName = "CuteBot", scrapeStatus = "notOpted";
 
         if (botDetails) {
             // Check if botDetails is already an object (some Redis clients auto-parse JSON)
@@ -198,6 +256,7 @@ export const freestyleWebsiteBotController = async (req: Request, res: Response)
             botStatus = { status: parsedDetails.status };
             botConfig = { config: parsedDetails.config };
             botName = parsedDetails.botName || "CuteBot";
+            scrapeStatus = parsedDetails.scrapeStatus || "notOpted";
         }
         else {
             botStatus = await BotStructureModel.findOne({ _id: botId, platform: 'Website' });
@@ -210,10 +269,13 @@ export const freestyleWebsiteBotController = async (req: Request, res: Response)
                 return res.status(404).json({ message: "Bot configuration not found." });
             }
 
+            scrapeStatus = (botStatus as any).scrapeStatus || "notOpted";
+
             await redis.set(`WebsiteBotDetails:${botId}`, JSON.stringify({
                 status: botStatus.status,
                 botName: botStatus.botName,
                 config: botConfig.config,
+                scrapeStatus: scrapeStatus,
             }), { ex: 1800 }); //cache for 30 minutes
         };
 
@@ -295,8 +357,17 @@ Bot: ${example.answer || ""}`)
         const apiUsageRules = config.apiUsageRules || "";
         const tools = hasApiIntegration ? getToolDefinitions(hasApiIntegration, apiUsageRules) : [];
 
+        // RAG Pipeline: Retrieve context only if scraping is completed
+        let ragContext: string | null = null;
+        if (scrapeStatus === "completed") {
+            ragContext = await retrieveRAGContext(botId, userMessage, 3);
+        }
+
+        // Build messages array with optional RAG context injection
         const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
             { role: "system", content: systemPrompt },
+            // Inject RAG context as a separate system message (token-efficient)
+            ...(ragContext ? [{ role: "system" as const, content: `Relevant website information:\n${ragContext}\n\nUse this context to answer user questions accurately. Cite the relevant section numbers when applicable.` }] : []),
             ...lastMessages,
             { role: "user", content: userMessage }
         ];
