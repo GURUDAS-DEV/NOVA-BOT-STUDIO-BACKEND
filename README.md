@@ -32,7 +32,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Bot Configuration** | CRUD for bot metadata, custom prompts, and system settings. | ✅ Stable |
 | **AI Feature Management** | Toggle AI modules (e.g., text‑enhancer, validator) per bot. | ✅ Stable |
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
-| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. | ✅ Stable |
+| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. **Now returns enriched payloads with navigation options and message arrays**. | ✅ Stable |
 | **Controlled Bot Management** | Create lightweight “website‑controlled” bots, configure style, and retrieve details via dedicated routes. | ✅ Stable |
 | **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats. | ✅ Stable |
 | **Multi‑DB Support** | PostgreSQL (`pg`) & MongoDB (`mongoose`). | ✅ Stable |
@@ -109,21 +109,6 @@ src/
 * **Redis** is used as a fast cache for API‑key look‑ups, session storage, and real‑time bot messaging.  
 * **JWT** tokens are signed with separate secrets for access and refresh tokens, enabling short‑lived access tokens and long‑lived refresh tokens stored in HTTP‑only cookies.  
 * **ControlledBotModel** stores lightweight bots that run entirely on the website layer; the `platform` field (default `Website`) and lifecycle status are part of the schema.  
-
----  
-
-## COMMIT DIFF  
-
-```diff
-Commit Message: Merge branch 'main' of https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND
-
-Files Changed: 1
-
-Modified (1):
-  ~ README.md (+27/-15 lines)
-
-Total Changes: +27 -15
-```
 
 ---  
 
@@ -304,63 +289,95 @@ await axios.post(
 GET http://localhost:9000/api/bot/getControlledBotById/64b2e3d4f6a7c9e0b1c2
 ```
 
+### Interact with a website‑controlled bot (new enriched response)
+
+```typescript
+const { data } = await axios.post(
+  'http://localhost:9000/api/bot/communicateWebsiteBot',
+  {
+    botId: '64b2e3d4f6a7c9e0b1c2d3e4',
+    userMessage: 'How can I reset my password?',
+  },
+  {
+    headers: { Cookie: `refreshToken=${refreshToken}` },
+    withCredentials: true,
+  }
+);
+
+/*
+  Example enriched payload:
+  {
+    "messages": [
+      { "role": "assistant", "content": "Sure, I can help with that." },
+      { "role": "assistant", "content": "Please click the button below." }
+    ],
+    "navigationOptions": [
+      { "label": "Reset Password", "action": "reset_password" },
+      { "label": "Contact Support", "action": "contact_support" }
+    ],
+    "sessionId": "a1b2c3d4e5f6"
+  }
+*/
+```
+
+The **`navigationOptions`** array lets the front‑end render quick‑action buttons, while **`messages`** may contain multiple assistant replies in a single response.
+
 ---  
 
-## Development  
+## API Documentation  
 
-### Setting up the development environment  
+### Authentication  
 
-```bash
-# Clone & install (see Getting Started)
-npm run dev   # starts the server with ts-node-dev
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/auth/register` | Register a new user (email + password). | ❌ |
+| `POST` | `/api/auth/login` | Login and receive access/refresh tokens (set as HTTP‑only cookies). | ❌ |
+| `POST` | `/api/auth/refresh-token` | Refresh an expired access token using the refresh cookie. | ❌ |
+| `POST` | `/api/auth/logout` | Invalidate refresh token and clear cookies. | ✅ (access token) |
+
+### Bot Management  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/bot/createControlledBot` | Create a lightweight website‑controlled bot. | ✅ |
+| `GET` | `/api/bot/getControlledBotById/:id` | Retrieve a controlled bot’s full definition. | ✅ |
+| `POST` | `/api/bot/setupWebsiteControlledStyleBotConfig` | Save UI style configuration for a website bot. | ✅ |
+| `POST` | `/api/bot/communicateWebsiteBot` | Send a user message to a website bot and receive enriched response payload (messages + navigation options). | ✅ |
+| `GET` | `/api/bot/` | List all bots owned by the authenticated user. | ✅ |
+
+#### `POST /api/bot/communicateWebsiteBot` – Request & Response  
+
+**Request Body**
+
+```json
+{
+  "botId": "string (required)",
+  "userMessage": "string (required)",
+  "sessionId": "string (optional, for continued conversation)"
+}
 ```
 
-### Running tests  
+**Response Body (new enriched format)**
 
-```bash
-npm test               # runs Jest unit & integration tests
-npm run test:watch     # watch mode
+```json
+{
+  "messages": [
+    { "role": "assistant", "content": "string" },
+    { "role": "assistant", "content": "string" }
+  ],
+  "navigationOptions": [
+    { "label": "string", "action": "string" }
+  ],
+  "sessionId": "string"
+}
 ```
 
-### Linting & formatting  
+* `messages` – Ordered list of assistant replies (supports multi‑message responses).  
+* `navigationOptions` – Optional quick‑action buttons the UI can render. Each option contains a human‑readable `label` and an `action` identifier understood by the front‑end.  
+* `sessionId` – Identifier for the ongoing conversation; return it unchanged to maintain context across calls.
 
-```bash
-npm run lint           # ESLint check
-npm run lint:fix       # auto‑fix lint errors
-npm run format         # Prettier formatting
-```
+### API‑Key Management  
 
-### Debugging  
-
-* **VS Code** – Use the provided `launch.json` (generated by `npm run dev`) to attach to the running process.  
-* **Logging** – HTTP requests are logged with `morgan`; application logs use `winston`. Adjust `LOG_LEVEL` in `.env` (`debug` for verbose output).
-
----  
-
-## Deployment  
-
-### Production build  
-
-```bash
-npm run build   # compiles TypeScript to ./dist
-npm start       # runs compiled code with node
-```
-
-### Docker (production)  
-
-```bash
-docker build -t nova-bot-studio-backend:latest .
-docker run -d \
-  -p 9000:9000 \
-  --restart unless-stopped \
-  --env-file .env \
-  nova-bot-studio-backend:latest
-```
-
-### Cloud platforms  
-
-| Platform | Notes |
-|----------|-------|
-| **Heroku / Render** | Set the buildpack to `heroku/nodejs`. Provide the same environment variables. |
-| **AWS ECS / Fargate** | Push the Docker image to ECR and reference it in your task definition. |
-| **DigitalOcean App Platform** | Choose “
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/api-key/generate` | Generate a new API
