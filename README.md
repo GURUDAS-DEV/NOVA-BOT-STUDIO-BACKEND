@@ -99,7 +99,7 @@ src/
 │   └─ types/             # Shared TypeScript types
 ├─ Database/              # DB connection wrappers (PostgreSQL & MongoDB)
 ├─ Redis/                 # Redis client singleton
-├─ Middleware/            # Auth & access control middlewares
+├─ Middleware/            # Auth & access‑control middlewares
 ├─ Static/                # Assets (logo, etc.)
 ├─ index.ts               # Application entry point
 └─ tsconfig.json
@@ -108,7 +108,22 @@ src/
 * **Express routers** delegate to controllers, which interact with the data layer (PostgreSQL, MongoDB) and auxiliary services (Redis, JWT).  
 * **Redis** is used as a fast cache for API‑key look‑ups, session storage, and real‑time bot messaging.  
 * **JWT** tokens are signed with separate secrets for access and refresh tokens, enabling short‑lived access tokens and long‑lived refresh tokens stored in HTTP‑only cookies.  
-* **ControlledBotModel** stores lightweight bots that run entirely on the website layer; the `platform` field (default `Website`) and lifecycle status are part of the schema.
+* **ControlledBotModel** stores lightweight bots that run entirely on the website layer; the `platform` field (default `Website`) and lifecycle status are part of the schema.  
+
+---  
+
+## COMMIT DIFF  
+
+```diff
+Commit Message: Merge branch 'main' of https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND
+
+Files Changed: 1
+
+Modified (1):
+  ~ README.md (+27/-15 lines)
+
+Total Changes: +27 -15
+```
 
 ---  
 
@@ -348,37 +363,4 @@ docker run -d \
 |----------|-------|
 | **Heroku / Render** | Set the buildpack to `heroku/nodejs`. Provide the same environment variables. |
 | **AWS ECS / Fargate** | Push the Docker image to ECR and reference it in your task definition. |
-| **DigitalOcean App Platform** | Choose “Dockerfile” as the source and add the required env vars. |
-| **Google Cloud Run** | Deploy the container image; configure port `9000` and env vars via Cloud Run settings. |
-
-### Performance considerations  
-
-* **Redis clustering** for high‑throughput API‑key validation.  
-* **PostgreSQL connection pooling** (`pg-pool`) – tune `MAX_POOL_SIZE` in `.env`.  
-* **Session TTL** – set `SESSION_TTL_SECONDS` according to your security policy; shorter TTL reduces stale session risk.  
-* **Enable HTTP/2** on reverse proxies (e.g., Nginx) for lower latency on API calls.
-
----  
-
-## API Documentation  
-
-All endpoints are prefixed with `/api`. The API follows REST conventions and returns JSON. Authentication is required for all routes except `/auth/register`, `/auth/login`, `/auth/refresh`, and `/ping`.
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/ping` | ❌ | Health check |
-| `POST` | `/api/auth/register` | ❌ | Register a new user |
-| `POST` | `/api/auth/login` | ❌ | Login and receive JWT cookies |
-| `POST` | `/api/auth/refresh` | ❌ (uses refresh cookie) | Refresh access token |
-| `POST` | `/api/auth/logout` | ✅ | Invalidate refresh token & clear cookies |
-| `GET` | `/api/bot/` | ✅ | List bots owned by the caller |
-| `POST` | `/api/bot/create` | ✅ | Create a standard bot |
-| `POST` | `/api/bot/createControlledBot` | ✅ | Create a website‑controlled bot |
-| `GET` | `/api/bot/:id` | ✅ | Retrieve a bot by its ID |
-| `PUT` | `/api/bot/:id` | ✅ | Update bot configuration |
-| `DELETE` | `/api/bot/:id` | ✅ | Delete a bot |
-| `POST` | `/api/bot/setupWebsiteControlledStyleBotConfig` | ✅ | Set UI style for a controlled bot |
-| `GET` | `/api/bot/getControlledBotById/:id` | ✅ | Retrieve a specific controlled bot |
-| `POST` | `/api/api-key/generate` | ✅ | Generate a new API key |
-| `POST` | `/api/api-key/revoke` | ✅ | Revoke an existing API key |
-| `GET` | `/api/api-key
+| **DigitalOcean App Platform** | Choose “
