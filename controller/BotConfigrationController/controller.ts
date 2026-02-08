@@ -2,6 +2,10 @@ import type { Request, Response } from "express";
 import { sanitizeAPIResponse } from "../../utils/helper/SantizingApi.js";
 import { botConfiguration } from "../../Models/BotConfiguration.js";
 import { BotStructureModel } from "../../Models/BotStructure.js";
+import { ControlledBotModel } from "../../Models/ControlledBotSchema.js";
+import { ControlledBotEdgeModel } from "../../Models/ControlledBotEdges.js";
+import { ControlledBotNodeModel } from "../../Models/ControlledBotNodes.js";
+import type { constructedControlledBot } from "../../utils/types/ConstructedControlledBot.js";
 
 export const getConfigController = async (req: Request, res: Response): Promise<Response> => {
     try{
@@ -142,6 +146,64 @@ export const updateConfigController = async (req: Request, res: Response): Promi
         await botConfig.save();
 
         return res.status(200).json({ message : "Updated Config successfully" });
+    }
+    catch(e){
+        return res.status(500).json({ message : "Internal Server Error!", error : e });
+    }
+}
+
+export const getControlledBotConfigController = async (req: Request, res: Response): Promise<Response> => {
+    try{
+        const {botId} = req.params;
+        if(!botId)
+            return res.status(400).json({ message : "Bot ID is required." });
+
+        const botModel = await ControlledBotModel.findById(botId);
+        if(!botModel)
+            return res.status(404).json({ message : "Bot not found." });
+
+        const botNodes = await ControlledBotNodeModel.find({ botId : botId });
+        if(!botNodes)
+            return res.status(200).json({ });
+
+        const BotEdges = await ControlledBotEdgeModel.find({botId : botId});
+
+        const constructedBot : constructedControlledBot = {
+            _id : botModel._id,
+            name : botModel.name,
+            platform : botModel.platform,
+            userId : botModel.userId,
+            node : botNodes.map(node =>{
+                return {
+                    executor : node.executor,
+                    title : node.title,
+                    message : node.message,
+                    apiConfig : node.apiConfig?{
+                        endpointKey : node.apiConfig.endpointKey ?? null,
+                        method : node.apiConfig.method,
+                        nextNodeId : node.apiConfig.nextNodeId?.toString() || "",
+                        timeoutMs : node.apiConfig.timeoutMs ?? null,
+                        queryParameter : node.apiConfig.queryParameter || undefined,
+                    } : null,
+                    output : node.output?{
+                        mode : node.output.mode,
+                        optionCount : node.output.optionCount,
+                    }: null,
+                    options : BotEdges.filter(edge => edge.fromNodeId.toString() === node._id.toString()).map(edge => {
+                        return {
+                            intent : edge.intent,
+                            toNodeId : edge.toNodeId.toString(),
+                            order : edge.order,
+                            _id : edge._id,
+                            botId : edge.botId
+                        }
+                    })
+                }
+            })
+        }
+
+        console.log("constructedBot : ", constructedBot);
+        return res.status(200).json({ message : "Bot Configuration fetched successfully.", data: constructedBot});
     }
     catch(e){
         return res.status(500).json({ message : "Internal Server Error!", error : e });
