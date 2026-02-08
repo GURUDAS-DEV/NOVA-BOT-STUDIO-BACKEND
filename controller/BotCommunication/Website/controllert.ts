@@ -116,6 +116,16 @@ const toMinimalNodeWithOptions = (data: any) => {
     };
 };
 
+const toMinimalNodeWithNavOptions = (node: any) => {
+    if (!node) return null;
+    return {
+        node: toMinimalNode(node),
+        options: getNavigationOptions(),
+    };
+};
+
+const getNodeMessage = (node: any) => node?.output?.customText || node?.output?.text;
+
 const withChatSessionId = (res: Response, payload: Record<string, any>) => {
     const chatSessionId = res.locals?.chatSessionId as string | undefined;
     return chatSessionId ? { ...payload, chatSessionId } : payload;
@@ -550,13 +560,15 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                 console.log("Previous Node Data from Redis:(inside, 496)", previousNodeDataFromRedis);
                 if (previousNodeDataFromRedis?.currentNode.executor === 'none' && previousNodeDataFromRedis?.currentNode?.output?.mode === 'options') {
                     console.log("Previous Node Data Options:(inside, 499)", previousNodeDataFromRedis.options);
-                    return res.status(200).json({ type: "options", nodeData1: toMinimalNodeWithOptions(previousNodeDataFromRedis) });
+                    return res.status(200).json({ type: "options", nodeData: toMinimalNodeWithOptions(previousNodeDataFromRedis), nodeData1: toMinimalNodeWithOptions(previousNodeDataFromRedis) });
                 } else if (previousNodeDataFromRedis?.currentNode.executor === 'none' && previousNodeDataFromRedis?.currentNode?.output?.mode === 'text') {
                     console.log("Previous Node Data Options:(inside, 501)", previousNodeDataFromRedis.options);
-                    return res.status(200).json({ type: "text", nodeData2: toMinimalNode(previousNodeDataFromRedis?.currentNode || previousNodeDataFromRedis), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    const previousNodeData = previousNodeDataFromRedis?.currentNode || previousNodeDataFromRedis;
+                    return res.status(200).json({ type: "text", message: getNodeMessage(previousNodeData), nodeData: toMinimalNodeWithNavOptions(previousNodeData), nodeData2: toMinimalNode(previousNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 } else if (previousNodeDataFromRedis?.currentNode.executor === 'input') {
                     console.log("Previous Node Data Options:(inside, 503)", previousNodeDataFromRedis.options);
-                    return res.status(200).json({ type: "input", nodeData3: toMinimalNode(previousNodeDataFromRedis?.currentNode || previousNodeDataFromRedis), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    const previousNodeData = previousNodeDataFromRedis?.currentNode || previousNodeDataFromRedis;
+                    return res.status(200).json({ type: "input", nodeData: toMinimalNodeWithNavOptions(previousNodeData), nodeData3: toMinimalNode(previousNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
             }
 
@@ -583,24 +595,25 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     nextNodeDataFromRedis = await cacheNodeByType(nextNodeDataFromDb, nextNodeId.toString(), botId, redisKeyForNodes);
                 }
 
-                nextNodeDataFromRedis = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
+                const nextNodeDataContainer = nextNodeDataFromRedis;
+                const nextNodeData = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
                 // Return next node
-                if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
+                if (nextNodeData?.executor === 'none' && nextNodeData?.output?.mode === 'options') {
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
-                    return res.status(200).json({ type: "options", nodeData: toMinimalNode(nextNodeDataFromRedis) });
+                    return res.status(200).json({ type: "options", nodeData: toMinimalNodeWithOptions(nextNodeDataContainer) });
                 }
-                else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
+                else if (nextNodeData?.executor === 'none' && nextNodeData?.output?.mode === 'text') {
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
-                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis.output.customText, options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "text", message: getNodeMessage(nextNodeData), nodeData: toMinimalNodeWithNavOptions(nextNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
-                else if (nextNodeDataFromRedis?.executor === 'input') {
+                else if (nextNodeData?.executor === 'input') {
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
-                    return res.status(200).json({ type: "input", nodeData: toMinimalNode(nextNodeDataFromRedis), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "input", nodeData: toMinimalNodeWithNavOptions(nextNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
-                else if (nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'text') {
-                    const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
+                else if (nextNodeData?.executor === 'api' && nextNodeData?.output?.mode === 'text') {
+                    const apiNode = (nextNodeData as any)?.currentNode || nextNodeData;
                     const reqInfo = extractApiRequest(apiNode?.apiConfig);
 
                     if (!reqInfo || !reqInfo.endpoint) {
@@ -610,11 +623,11 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     const apiData = await callingConstructApiUponUserInput(fullApiUrl);
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
-                    return res.status(200).json({ type: "api", message: apiData, options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "api", message: apiData, nodeData: toMinimalNodeWithNavOptions(apiNode), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
-                else if (nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'options') {
-                    const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
+                else if (nextNodeData?.executor === 'api' && nextNodeData?.output?.mode === 'options') {
+                    const apiNode = (nextNodeData as any)?.currentNode || nextNodeData;
                     const reqInfo = extractApiRequest(apiNode?.apiConfig);
 
                     if (!reqInfo || !reqInfo.endpoint) {
@@ -689,11 +702,11 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
 
                     previousNodeDataFromRedis = previousNodeDataFromRedis?.currentNode || previousNodeDataFromRedis;
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: previousNodeId.toString(), previousNodeId: null }), { ex: 60 * 60 });
-                    return res.status(200).json({ type: "text", nodeData: toMinimalNode(previousNodeDataFromRedis), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "text", message: getNodeMessage(previousNodeDataFromRedis), nodeData: toMinimalNodeWithNavOptions(previousNodeDataFromRedis), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
                 await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: sessionCurrentNodeId, previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
-                return res.status(200).json({ type: "text", nodeData: currentNodeData.output.text, options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                return res.status(200).json({ type: "text", message: getNodeMessage(currentNodeData), nodeData: toMinimalNodeWithNavOptions(currentNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
             }
             else if (currentNodeData.executor === 'input') {
                 if (!input) {
@@ -717,27 +730,28 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     nextNodeDataFromRedis = nextNodeDataFromDb;
                 };
 
-                nextNodeDataFromRedis = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
+                const nextNodeDataContainer = nextNodeDataFromRedis;
+                const nextNodeData = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
 
                 // Return next node
-                if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
+                if (nextNodeData?.executor === 'none' && nextNodeData?.output?.mode === 'options') {
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
-                    return res.status(200).json({ type: "options", nodeData: toMinimalNode(nextNodeDataFromRedis) });
+                    return res.status(200).json({ type: "options", nodeData: toMinimalNodeWithOptions(nextNodeDataContainer) });
                 }
 
-                else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
+                else if (nextNodeData?.executor === 'none' && nextNodeData?.output?.mode === 'text') {
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
-                    return res.status(200).json({ type: "text", nodeData: toMinimalNode(nextNodeDataFromRedis), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "text", message: getNodeMessage(nextNodeData), nodeData: toMinimalNodeWithNavOptions(nextNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
-                else if (nextNodeDataFromRedis?.executor === 'input') {
+                else if (nextNodeData?.executor === 'input') {
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
-                    return res.status(200).json({ type: "input", nodeData: toMinimalNode(nextNodeDataFromRedis), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "input", nodeData: toMinimalNodeWithNavOptions(nextNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
-                else if (nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'text') {
+                else if (nextNodeData?.executor === 'api' && nextNodeData?.output?.mode === 'text') {
 
-                    const apiFormatFromLLM: apiConstructorTemplate = await constructApiUponUserInput(nextNodeDataFromRedis.apiConfig, input);
+                    const apiFormatFromLLM: apiConstructorTemplate = await constructApiUponUserInput(nextNodeData.apiConfig, input);
 
                     if (!apiFormatFromLLM.success) {
                         return res.status(500).json({ message: apiFormatFromLLM.error || "API construction failed. Please try again." });
@@ -758,11 +772,11 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
 
                     const responseToSend = await generatingResponseFromApiResult(input, response);
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionalBotDetails.previousNodeId }), { ex: 60 * 60 });
-                    return res.status(200).json({ type: "api", message: responseToSend, options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "api", message: responseToSend, nodeData: toMinimalNodeWithNavOptions(nextNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
 
-                else if (nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'options') {
-                    const apiEndpoint = nextNodeDataFromRedis.apiConfig?.endpointKey;
+                else if (nextNodeData?.executor === 'api' && nextNodeData?.output?.mode === 'options') {
+                    const apiEndpoint = nextNodeData.apiConfig?.endpointKey;
                     if (!apiEndpoint) {
                         return res.status(500).json({ message: "API endpoint is not configured properly. Contact bot owner. Thanks for using us." });
                     }
@@ -842,25 +856,26 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     nextNodeDataFromRedis = await cacheNodeByType(nextNodeDataFromDb, nextNodeId.toString(), botId, redisKeyForNodes);
                 }
 
-                nextNodeDataFromRedis = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
+                const nextNodeDataContainer = nextNodeDataFromRedis;
+                const nextNodeData = nextNodeDataFromRedis?.currentNode || nextNodeDataFromRedis;
 
 
-                if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'options') {
+                if (nextNodeData?.executor === 'none' && nextNodeData?.output?.mode === 'options') {
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });
-                    return res.status(200).json({ type: "options", nodeData: toMinimalNode(nextNodeDataFromRedis) });
+                    return res.status(200).json({ type: "options", nodeData: toMinimalNodeWithOptions(nextNodeDataContainer) });
                 }
-                else if (nextNodeDataFromRedis?.executor === 'none' && nextNodeDataFromRedis?.output?.mode === 'text') {
+                else if (nextNodeData?.executor === 'none' && nextNodeData?.output?.mode === 'text') {
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
-                    return res.status(200).json({ type: "text", nodeData: nextNodeDataFromRedis.output.customText, options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "text", message: getNodeMessage(nextNodeData), nodeData: toMinimalNodeWithNavOptions(nextNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
-                else if (nextNodeDataFromRedis?.executor === 'input') {
+                else if (nextNodeData?.executor === 'input') {
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
-                    return res.status(200).json({ type: "input", nodeData: toMinimalNode(nextNodeDataFromRedis), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "input", nodeData: toMinimalNodeWithNavOptions(nextNodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
-                else if(nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'text') {
-                    const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
+                else if(nextNodeData?.executor === 'api' && nextNodeData?.output?.mode === 'text') {
+                    const apiNode = (nextNodeData as any)?.currentNode || nextNodeData;
                     const reqInfo = extractApiRequest(apiNode?.apiConfig);
                     if (!reqInfo || !reqInfo.endpoint) {
                         return res.status(500).json({ message: "API configuration is missing or invalid for the next node." });
@@ -870,10 +885,10 @@ export const controlledStyleWebsiteBotController = async (req: Request, res: Res
                     const apiData = await callingConstructApiUponUserInput(fullApiUrl);
 
                     await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nextNodeId.toString(), previousNodeId: sessionCurrentNodeId }), { ex: 60 * 60 });//1 hr
-                    return res.status(200).json({ type: "api", message: apiData, options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
+                    return res.status(200).json({ type: "api", message: apiData, nodeData: toMinimalNodeWithNavOptions(apiNode), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } });
                 }
-                else if(nextNodeDataFromRedis?.executor === 'api' && nextNodeDataFromRedis?.output?.mode === 'options') {
-                    const apiNode = (nextNodeDataFromRedis as any)?.currentNode || nextNodeDataFromRedis;
+                else if(nextNodeData?.executor === 'api' && nextNodeData?.output?.mode === 'options') {
+                    const apiNode = (nextNodeData as any)?.currentNode || nextNodeData;
                     const reqInfo = extractApiRequest(apiNode?.apiConfig);
 
                     if (!reqInfo || !reqInfo.endpoint) {
@@ -982,11 +997,11 @@ const processInitialNode = async (
     } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
         await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeData), { ex: 86400 });
         await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
-        return res.status(200).json(withChatSessionId(res, { type: "text", nodeData: toMinimalNode(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
+        return res.status(200).json(withChatSessionId(res, { type: "text", message: getNodeMessage(nodeData), nodeData: toMinimalNodeWithNavOptions(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
     } else if (nodeData.executor === 'input') {
         await redis.set(redisKeyForNodes(nodeId), JSON.stringify(nodeData), { ex: 86400 });
         await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
-        return res.status(200).json(withChatSessionId(res, { type: "input", nodeData: toMinimalNode(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
+        return res.status(200).json(withChatSessionId(res, { type: "input", nodeData: toMinimalNodeWithNavOptions(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
     } else if (nodeData.executor === 'api' && nodeData.output?.mode === 'text') {
         const apiEndpoint = nodeData.apiConfig?.endpointKey;
         if (!apiEndpoint) {
@@ -999,7 +1014,7 @@ const processInitialNode = async (
         }
 
         console.log("API Node Data: ", response);
-        return res.status(200).json(withChatSessionId(res, { type: "api", message: response, options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
+        return res.status(200).json(withChatSessionId(res, { type: "api", message: response, nodeData: toMinimalNodeWithNavOptions(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
     }
     else if( nodeData.executor === 'api' && nodeData.output?.mode === 'options') {
         const apiNode = nodeData;
@@ -1078,10 +1093,10 @@ const processInitialNodeFromRedis = async (
         return res.status(200).json(withChatSessionId(res, { type: "options", nodeData: toMinimalNodeWithOptions(nodeDataFromRedis) }));
     } else if (nodeData.executor === 'none' && nodeData.output?.mode === 'text') {
         await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
-        return res.status(200).json(withChatSessionId(res, { type: "text", nodeData: toMinimalNode(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
+        return res.status(200).json(withChatSessionId(res, { type: "text", message: getNodeMessage(nodeData), nodeData: toMinimalNodeWithNavOptions(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
     } else if (nodeData.executor === 'input') {
         await redis.set(sessionalRedisKey, JSON.stringify({ currentNodeId: nodeId, previousNodeId: null }), { ex: 60 * 60 });
-        return res.status(200).json(withChatSessionId(res, { type: "input", nodeData: toMinimalNode(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
+        return res.status(200).json(withChatSessionId(res, { type: "input", nodeData: toMinimalNodeWithNavOptions(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
     } else if (nodeData.executor === 'api' && nodeData.output?.mode === 'text') {
         const apiEndpoint = nodeData.apiConfig?.endpointKey;
         if (!apiEndpoint) {
@@ -1094,7 +1109,7 @@ const processInitialNodeFromRedis = async (
 
         console.log("API Node Data: ", response);
 
-        return res.status(200).json(withChatSessionId(res, { type: "api", message: response, options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
+        return res.status(200).json(withChatSessionId(res, { type: "api", message: response, nodeData: toMinimalNodeWithNavOptions(nodeData), options: getNavigationOptions(), back: { label: "Go Back", _id: "GO_BACK" }, end: { label: "End Chat", _id: "END_CHAT" } }));
 
     }
     else if (nodeData.executor === 'api' && nodeData.output?.mode === 'options') {
