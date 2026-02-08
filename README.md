@@ -32,7 +32,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Bot Configuration** | CRUD for bot metadata, custom prompts, and system settings. | ✅ Stable |
 | **AI Feature Management** | Toggle AI modules (e.g., text‑enhancer, validator) per bot. | ✅ Stable |
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
-| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. **Now returns enriched payloads with navigation options and message arrays**. | ✅ Stable |
+| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. Returns enriched payloads with navigation options and message arrays. | ✅ Stable |
 | **Controlled Bot Management** | Create lightweight “website‑controlled” bots, configure style, and retrieve details via dedicated routes. | ✅ Stable |
 | **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats. | ✅ Stable |
 | **Multi‑DB Support** | PostgreSQL (`pg`) & MongoDB (`mongoose`). | ✅ Stable |
@@ -289,7 +289,7 @@ await axios.post(
 GET http://localhost:9000/api/bot/getControlledBotById/64b2e3d4f6a7c9e0b1c2
 ```
 
-### Interact with a website‑controlled bot (new enriched response)
+### Interact with a website‑controlled bot (enriched response)
 
 ```typescript
 const { data } = await axios.post(
@@ -319,8 +319,6 @@ const { data } = await axios.post(
   }
 */
 ```
-
-The **`navigationOptions`** array lets the front‑end render quick‑action buttons, while **`messages`** may contain multiple assistant replies in a single response.
 
 ---  
 
@@ -357,7 +355,7 @@ The **`navigationOptions`** array lets the front‑end render quick‑action but
 }
 ```
 
-**Response Body (new enriched format)**
+**Response Body**
 
 ```json
 {
@@ -373,11 +371,30 @@ The **`navigationOptions`** array lets the front‑end render quick‑action but
 ```
 
 * `messages` – Ordered list of assistant replies (supports multi‑message responses).  
-* `navigationOptions` – Optional quick‑action buttons the UI can render. Each option contains a human‑readable `label` and an `action` identifier understood by the front‑end.  
+* `navigationOptions` – Optional quick‑action buttons the UI can render.  
 * `sessionId` – Identifier for the ongoing conversation; return it unchanged to maintain context across calls.
 
 ### API‑Key Management  
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `POST` | `/api/api-key/generate` | Generate a new API
+| `POST` | `/api/api-key/generate` | Generate a new API key for the authenticated user. | ✅ |
+| `GET` | `/api/api-key/validate/:key` | Validate an API key (cached in Redis). | ❌ (public) |
+| `DELETE` | `/api/api-key/revoke/:keyId` | Revoke a specific API key. | ✅ |
+
+### Bot Analytics  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `GET` | `/api/analytics/bot/:botId` | Retrieve aggregated statistics for a bot. | ✅ |
+| `GET` | `/api/analytics/user/:userId` | Retrieve usage stats across all bots owned by a user. | ✅ |
+
+---  
+
+## Development  
+
+### Setting up the development environment  
+
+```bash
+# Clone (if you haven't already)
+git clone
