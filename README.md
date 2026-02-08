@@ -112,6 +112,20 @@ src/
 
 ---  
 
+## COMMIT DIFF
+```diff
+Commit Message: Merge branch 'main' of https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND
+
+Files Changed: 1
+
+Modified (1):
+  ~ README.md (+24/-7 lines)
+
+Total Changes: +24 -7
+```
+
+---  
+
 ## Getting Started  
 
 ### Prerequisites  
@@ -330,71 +344,4 @@ const { data } = await axios.post(
 |--------|----------|-------------|------|
 | `POST` | `/api/auth/register` | Register a new user (email + password). | ❌ |
 | `POST` | `/api/auth/login` | Login and receive access/refresh tokens (set as HTTP‑only cookies). | ❌ |
-| `POST` | `/api/auth/refresh-token` | Refresh an expired access token using the refresh cookie. | ❌ |
-| `POST` | `/api/auth/logout` | Invalidate refresh token and clear cookies. | ✅ (access token) |
-
-### Bot Management  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/api/bot/createControlledBot` | Create a lightweight website‑controlled bot. | ✅ |
-| `GET` | `/api/bot/getControlledBotById/:id` | Retrieve a controlled bot’s full definition. | ✅ |
-| `POST` | `/api/bot/setupWebsiteControlledStyleBotConfig` | Save UI style configuration for a website bot. | ✅ |
-| `POST` | `/api/bot/communicateWebsiteBot` | Send a user message to a website bot and receive enriched response payload (messages + navigation options). | ✅ |
-| `GET` | `/api/bot/` | List all bots owned by the authenticated user. | ✅ |
-
-#### `POST /api/bot/communicateWebsiteBot` – Request & Response  
-
-**Request Body**
-
-```json
-{
-  "botId": "string (required)",
-  "userMessage": "string (required)",
-  "sessionId": "string (optional, for continued conversation)"
-}
-```
-
-**Response Body**
-
-```json
-{
-  "messages": [
-    { "role": "assistant", "content": "string" },
-    { "role": "assistant", "content": "string" }
-  ],
-  "navigationOptions": [
-    { "label": "string", "action": "string" }
-  ],
-  "sessionId": "string"
-}
-```
-
-* `messages` – Ordered list of assistant replies (supports multi‑message responses).  
-* `navigationOptions` – Optional quick‑action buttons the UI can render.  
-* `sessionId` – Identifier for the ongoing conversation; return it unchanged to maintain context across calls.
-
-### API‑Key Management  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/api/api-key/generate` | Generate a new API key for the authenticated user. | ✅ |
-| `GET` | `/api/api-key/validate/:key` | Validate an API key (cached in Redis). | ❌ (public) |
-| `DELETE` | `/api/api-key/revoke/:keyId` | Revoke a specific API key. | ✅ |
-
-### Bot Analytics  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `GET` | `/api/analytics/bot/:botId` | Retrieve aggregated statistics for a bot. | ✅ |
-| `GET` | `/api/analytics/user/:userId` | Retrieve usage stats across all bots owned by a user. | ✅ |
-
----  
-
-## Development  
-
-### Setting up the development environment  
-
-```bash
-# Clone (if you haven't already)
-git clone
+| `POST` | `/api/auth/refresh-token` |
