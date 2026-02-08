@@ -1303,16 +1303,6 @@ function extractApiRequest(apiConfig: any): { endpoint: string; queryParams?: Ob
     return { endpoint, queryParams };
 }
 
-// Invoke API and summarize without requiring user input
-async function invokeApiAndSummarize(apiConfig: any, titleFallback: string): Promise<string> {
-    const info = extractApiRequest(apiConfig);
-    if (!info || !info.endpoint) throw new Error("Invalid API configuration");
-    const url = buildUrl(info.endpoint, info.queryParams || {});
-    const apiData = await callingConstructApiUponUserInput(url);
-    const message = await generatingResponseFromApiResult(titleFallback || "API Node Response", apiData);
-    return message as string;
-}
-
 const callingConstructApiUponUserInput = async (apiEndpoint: string) => {
     try {
         const response = await fetch(apiEndpoint);
