@@ -155,6 +155,7 @@ export const updateConfigController = async (req: Request, res: Response): Promi
 export const getControlledBotConfigController = async (req: Request, res: Response): Promise<Response> => {
     try{
         const {botId} = req.params;
+        console.log("Received botId:", botId);
         if(!botId)
             return res.status(400).json({ message : "Bot ID is required." });
 
@@ -202,10 +203,10 @@ export const getControlledBotConfigController = async (req: Request, res: Respon
             })
         }
 
-        console.log("constructedBot : ", constructedBot);
         return res.status(200).json({ message : "Bot Configuration fetched successfully.", data: constructedBot});
     }
     catch(e){
+        console.log("Error in getControlledBotConfigController:", e);
         return res.status(500).json({ message : "Internal Server Error!", error : e });
     }
 }
