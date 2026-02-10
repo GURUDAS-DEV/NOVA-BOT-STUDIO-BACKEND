@@ -30,7 +30,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Authentication** | JWT login, registration, refresh tokens, role‑based middleware. | ✅ Stable |
 | **API‑Key Management** | Secure generation, hashing, revocation, Redis‑backed lookup. | ✅ Stable |
 | **Bot Configuration** | CRUD for bot metadata, custom prompts, and system settings. | ✅ Stable |
-| **AI Feature Management** | Toggle AI modules (e.g., text‑enhancer, validator) per bot. | ✅ Stable |
+| **AI Feature Management** | Toggle AI modules (e.g., `TextEnhancer`, `TextValidator`) per bot. | ✅ Stable |
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
 | **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. Returns enriched payloads with navigation options and message arrays. | ✅ Stable |
 | **Controlled Bot Management** | Create lightweight “website‑controlled” bots, configure style, and retrieve details via dedicated routes. | ✅ Stable |
@@ -65,7 +65,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ```
 src/
-├─ controller/            # Request handlers (business logic)
+├─ controller/                # Request handlers (business logic)
 │   ├─ authentication/
 │   ├─ API_Key_Management/
 │   ├─ Bot_Management/
@@ -76,7 +76,7 @@ src/
 │   ├─ BotCommunication/
 │   │   └─ Website/
 │   └─ Testing/
-├─ Router/                # Express routers – one per domain
+├─ Router/                    # Express routers – one per domain
 │   ├─ Authentication/
 │   ├─ API_Key_Management/
 │   ├─ Bot_Management/
@@ -87,21 +87,21 @@ src/
 │   ├─ BotCommunication/
 │   │   └─ Website/
 │   └─ Testing/
-├─ Models/                # Mongoose / TypeORM schemas
+├─ Models/                    # Mongoose / TypeORM schemas
 │   ├─ BotStructure.ts
 │   ├─ BotConfiguration.ts
 │   ├─ ControlledBotSchema.ts   ← schema for website‑controlled bots
 │   └─ … (other models)
 ├─ utils/
-│   ├─ JWT/               # Token generation & validation
-│   ├─ System_Prompt/     # Prompt‑related helpers
-│   ├─ helper/            # Miscellaneous utilities (API‑key, sanitising, etc.)
-│   └─ types/             # Shared TypeScript types
-├─ Database/              # DB connection wrappers (PostgreSQL & MongoDB)
-├─ Redis/                 # Redis client singleton
-├─ Middleware/            # Auth & access‑control middlewares
-├─ Static/                # Assets (logo, etc.)
-├─ index.ts               # Application entry point
+│   ├─ JWT/                   # Token generation & validation
+│   ├─ System_Prompt/         # Prompt‑related helpers
+│   ├─ helper/                # Misc. utilities (API‑key, sanitising, etc.)
+│   └─ types/                 # Shared TypeScript types
+├─ Database/                  # DB connection wrappers (PostgreSQL & MongoDB)
+├─ Redis/                     # Redis client singleton
+├─ Middleware/                # Auth & access‑control middlewares
+├─ Static/                    # Assets (logo, etc.)
+├─ index.ts                   # Application entry point
 └─ tsconfig.json
 ```
 
@@ -109,20 +109,6 @@ src/
 * **Redis** is used as a fast cache for API‑key look‑ups, session storage, and real‑time bot messaging.  
 * **JWT** tokens are signed with separate secrets for access and refresh tokens, enabling short‑lived access tokens and long‑lived refresh tokens stored in HTTP‑only cookies.  
 * **ControlledBotModel** stores lightweight bots that run entirely on the website layer; the `platform` field (default `Website`) and lifecycle status are part of the schema.  
-
----  
-
-## COMMIT DIFF
-```diff
-Commit Message: Merge branch 'main' of https://github.com/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND
-
-Files Changed: 1
-
-Modified (1):
-  ~ README.md (+24/-7 lines)
-
-Total Changes: +24 -7
-```
 
 ---  
 
@@ -344,4 +330,63 @@ const { data } = await axios.post(
 |--------|----------|-------------|------|
 | `POST` | `/api/auth/register` | Register a new user (email + password). | ❌ |
 | `POST` | `/api/auth/login` | Login and receive access/refresh tokens (set as HTTP‑only cookies). | ❌ |
-| `POST` | `/api/auth/refresh-token` |
+| `POST` | `/api/auth/refresh-token` | Refresh an expired access token using the refresh token cookie. | ❌ |
+| `POST` | `/api/auth/logout` | Invalidate refresh token and clear cookies. | ✅ (requires valid refresh token) |
+
+### API‑Key Management  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/api-key/generate` | Generate a new API key for the authenticated user. | ✅ |
+| `GET` | `/api/api-key/list` | List all active API keys for the user. | ✅ |
+| `DELETE` | `/api/api-key/revoke/:keyId` | Revoke a specific API key. | ✅ |
+
+### Bot Management  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/bot/create` | Create a new bot (standard or controlled). | ✅ |
+| `GET` | `/api/bot/` | Retrieve all bots owned by the authenticated user. | ✅ |
+| `GET` | `/api/bot/:botId` | Get details of a specific bot. | ✅ |
+| `PUT` | `/api/bot/:botId` | Update bot configuration (prompts, system settings, etc.). | ✅ |
+| `DELETE` | `/api/bot/:botId` | Delete a bot permanently. | ✅ |
+| `POST` | `/api/bot/createControlledBot` | Shortcut for creating a website‑controlled bot. | ✅ |
+| `POST` | `/api/bot/setupWebsiteControlledStyleBotConfig` | Apply UI style configuration to a controlled bot. | ✅ |
+| `GET` | `/api/bot/getControlledBotById/:botId` | Retrieve a controlled bot’s stored schema. | ✅ |
+| `POST` | `/api/bot/communicateWebsiteBot` | Send a user message to a website‑controlled bot and receive enriched response. | ✅ |
+
+### AI Feature Management  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `GET` | `/api/ai-features` | List all AI features and their current status per bot. | ✅ |
+| `PATCH` | `/api/ai-features/:botId` | Enable/disable specific AI modules for a bot. | ✅ |
+
+### Bot Analytics  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `GET` | `/api/analytics/:botId` | Retrieve aggregated usage statistics for a bot. | ✅ |
+| `GET` | `/api/analytics/:botId/events` | List raw event logs (messages, errors, timestamps). | ✅ |
+
+### Common Response Format  
+
+All successful responses follow:
+
+```json
+{
+  "status": "success",
+  "data": { /* endpoint‑specific payload */ }
+}
+```
+
+Error responses:
+
+```json
+{
+  "status": "error",
+  "message": "Human‑readable error description",
+  "code": "ERROR_CODE"
+}
+```
+
