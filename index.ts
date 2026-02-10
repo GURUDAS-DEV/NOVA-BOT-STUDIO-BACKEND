@@ -14,6 +14,7 @@ import APIKeyRouter from './Router/API_Key_Management/router.js';
 import { getRedisClient } from './Redis/connect.js';
 import communcationWithBotRouter from './Router/CommunicationWithBot/Website/router.js';
 import { botAnalyticsRouter } from './Router/BotAnalytics/router.js';
+import { deleteScheduler } from './Schedulers/DeleteBotScheduler.js';
 dotenv.config();
 
 const app = express();
@@ -39,6 +40,7 @@ app.use(express.urlencoded({ extended: true }));
 
 await intializeDB();
 await intializeMongoDB();
+deleteScheduler.start();
 
 const redis = getRedisClient();
 
