@@ -100,6 +100,7 @@ src/
 ├─ Database/                  # DB connection wrappers (PostgreSQL & MongoDB)
 ├─ Redis/                     # Redis client singleton
 ├─ Middleware/                # Auth & access‑control middlewares
+├─ Schedulers/                # Periodic jobs (e.g., DeleteBotScheduler)
 ├─ Static/                    # Assets (logo, etc.)
 ├─ index.ts                   # Application entry point
 └─ tsconfig.json
@@ -363,30 +364,4 @@ const { data } = await axios.post(
 | `PATCH` | `/api/ai-features/:botId` | Enable/disable specific AI modules for a bot. | ✅ |
 
 ### Bot Analytics  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `GET` | `/api/analytics/:botId` | Retrieve aggregated usage statistics for a bot. | ✅ |
-| `GET` | `/api/analytics/:botId/events` | List raw event logs (messages, errors, timestamps). | ✅ |
-
-### Common Response Format  
-
-All successful responses follow:
-
-```json
-{
-  "status": "success",
-  "data": { /* endpoint‑specific payload */ }
-}
-```
-
-Error responses:
-
-```json
-{
-  "status": "error",
-  "message": "Human‑readable error description",
-  "code": "ERROR_CODE"
-}
-```
 
