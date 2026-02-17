@@ -183,6 +183,7 @@ export const freestyleWebsiteBotController = async (req: Request, res: Response)
             apiKey = crypto.createHash('sha256').update(apiKey).digest('hex');
         }
 
+        console.log(userMessage)
         if (!botId || !userMessage) {
             return res.status(400).json({ message: "Bot ID and userMessage are required." });
         }

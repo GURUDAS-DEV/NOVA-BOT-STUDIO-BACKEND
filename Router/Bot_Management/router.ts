@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createBotController, createWebsiteControlledBot, createWebsiteControlledStyleBotConfig, deleteBotController, getBotDetailsForHomePageController, getDeletedBotsController, getOneBotDetailsController, getUnifiedBotsForManagePageController, permanentlyDeleteBotController, getOneControlledBotDetailsController, restoreDeletedBotController, detectBotTypeController } from "../../controller/Bot_Management/controller.js";
+import { createBotController, createWebsiteControlledBot, createWebsiteControlledStyleBotConfig, deleteBotController, getBotDetailsForHomePageController, getDeletedBotsController, getOneBotDetailsController, getUnifiedBotsForManagePageController, permanentlyDeleteBotController, getOneControlledBotDetailsController, restoreDeletedBotController, detectBotTypeController, scrapWebsiteForBotController } from "../../controller/Bot_Management/controller.js";
 import { authMiddleware } from "../../Middleware/authMiddleware.js";
 
 const BotManagementRouter = Router();
@@ -23,6 +23,8 @@ BotManagementRouter.delete("/permanentlyDeleteBot", authMiddleware, permanentlyD
 BotManagementRouter.post('/createControlledBot', authMiddleware, createWebsiteControlledBot);
 BotManagementRouter.post("/setupWebsiteControlledStyleBotConfig", authMiddleware, createWebsiteControlledStyleBotConfig);
 
-BotManagementRouter.post("/detectBotType", authMiddleware, detectBotTypeController)
+BotManagementRouter.post("/detectBotType", authMiddleware, detectBotTypeController);
+
+BotManagementRouter.post("/ScrapeWebsiteForBot", scrapWebsiteForBotController);
 
 export default BotManagementRouter;

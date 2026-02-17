@@ -9,6 +9,7 @@ export interface BotStructureType extends mongoose.Document {
     style : string;
     currentState : 'setup' | 'configure';
     status : 'active' | 'inactive' | 'paused' | 'draft' | 'deleted';
+    scrapeStatus : "notOpted" | "running" | "completed" | "failed";
     created_at ?: Date;
     updated_at ?: Date;
     deleted_at  ?: Date | null;

@@ -32,7 +32,6 @@ const BotSchema = new Schema({
     enum: ["draft", "active", "paused", "inactive", "deleted"],
     default: "draft"
   },
-
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   deleted_at: { type: Date , default: null },

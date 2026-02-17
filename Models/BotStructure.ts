@@ -23,7 +23,7 @@ const botStructureSchema = new Schema<BotStructureType>({
         enum: ['WhatsApp', 'Telegram', 'Discord', 'Instagram', 'Website'],
         required: true,
     },
-    currentState : {
+    currentState: {
         type: String,
         enum: ['setup', 'configure'],
         default: 'setup',
@@ -42,13 +42,18 @@ const botStructureSchema = new Schema<BotStructureType>({
         type: Date,
         default: Date.now,
     },
+    scrapeStatus: {
+        type: String,
+        enum: ["notOpted", "running", "completed", "failed"],
+        default: "notOpted",
+    },
     updated_at: {
         type: Date,
         default: Date.now,
     },
-    deleted_at : {
-        type : Date,
-        default : null
+    deleted_at: {
+        type: Date,
+        default: null
     },
 },
 );

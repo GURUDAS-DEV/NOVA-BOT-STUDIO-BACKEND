@@ -9,6 +9,7 @@ import { ControlledBotNodeModel } from "../../Models/ControlledBotNodes.js";
 import { ControlledBotEdgeModel } from "../../Models/ControlledBotEdges.js";
 import { platform } from "os";
 import { hashApiKey } from "../../utils/helper/APIKeyHashing.js";
+import { scrapeQueue } from "../../utils/BullMQ/BullMq.js";
 
 
 //-----------------------------------------------------------------------------------------------------------------//
@@ -834,5 +835,37 @@ export const detectBotTypeController = async(req : Request, res : Response) : Pr
   }
   catch(e){
     return res.status(500).json({ message : "Internal Server Error!", e });
+  }
+}
+
+export const scrapWebsiteForBotController = async(req : Request, res : Response) : Promise<Response> =>{
+  try{
+
+    const { url, botId, userId } = req.body;
+    // const userId = (req as any).user?.userId;
+    
+    if(!url || !botId){
+      return res.status(400).json({ message : "URL and BotId is required!"});
+    }
+    if(!userId){
+      return res.status(400).json({ message : "User ID is required!"});
+    }
+
+    await scrapeQueue.add('scrapeWebsite', { url, userId, botId }, {
+      attempts : 3, 
+      backoff : {
+        type : 'exponential',
+        delay : 5000,
+      }, 
+      removeOnComplete : true,
+      removeOnFail : false,
+    });
+    
+
+    return res.status(202).json({ message : "Scraping For Website has been started successfully! Continue configuring your bot. We will send an email notification once the scraping is completed." });
+  }
+  catch(error){
+    // console.error("Error scraping website:", error);
+    return res.status(500).json({ message : "Internal Server Error!" });
   }
 }
