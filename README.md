@@ -8,7 +8,7 @@
 
 ## Overview  
 
-NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for building and operating bot‑centric applications. It supports:
+NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for building and operating bot‑centric applications. It offers:
 
 * **Bot lifecycle management** – create, update, delete, and run bots.  
 * **AI feature toggling** – enable/disable advanced AI capabilities per bot.  
@@ -30,9 +30,9 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Authentication** | JWT login, registration, refresh tokens, role‑based middleware. | ✅ Stable |
 | **API‑Key Management** | Secure generation, hashing, revocation, Redis‑backed lookup. | ✅ Stable |
 | **Bot Configuration** | CRUD for bot metadata, custom prompts, and system settings. | ✅ Stable |
-| **AI Feature Management** | Toggle AI modules (e.g., `TextEnhancer`, `TextValidator`) per bot. | ✅ Stable |
+| **AI Feature Management** | Toggle AI modules (`TextEnhancer`, `TextValidator`, etc.) per bot. | ✅ Stable |
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
-| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. Returns enriched payloads with navigation options and message arrays. | ✅ Stable |
+| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. | ✅ Stable |
 | **Controlled Bot Management** | Create lightweight “website‑controlled” bots, configure style, and retrieve details via dedicated routes. | ✅ Stable |
 | **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats. | ✅ Stable |
 | **Multi‑DB Support** | PostgreSQL (`pg`) & MongoDB (`mongoose`). | ✅ Stable |
@@ -131,21 +131,23 @@ cd NOVA-BOT-STUDIO-BACKEND
 # 2️⃣ Install dependencies
 npm ci   # or `yarn install`
 
-# 3️⃣ Prepare environment variables
+# 3️⃣ Create environment file
 cp .env.example .env
 # Edit .env with your DB credentials, JWT secrets, etc.
 ```
 
 ### Database setup  
 
-* **PostgreSQL** – The first run will automatically create required tables via the `pg` client.  
-* **MongoDB** – Collections are created on demand; just ensure the database exists.
+* **PostgreSQL** – Tables are created automatically on first run via the `pg` client.  
+* **MongoDB** – Collections are created on demand; ensure the database exists.
 
 ### Running locally (development)  
 
 ```bash
 npm run dev   # uses ts-node-dev for hot‑reloading
 ```
+
+The API will be available at `http://localhost:9000`.
 
 ### Building & running (production)  
 
@@ -161,7 +163,10 @@ npm start
 docker build -t nova-bot-studio-backend .
 
 # Run the container (exposes port 9000)
-docker run -d -p 9000:9000 --env-file .env --restart unless-stopped nova-bot-studio-backend
+docker run -d -p 9000:9000 \
+  --env-file .env \
+  --restart unless-stopped \
+  nova-bot-studio-backend
 ```
 
 ---  
@@ -209,7 +214,7 @@ curl http://localhost:9000/ping
 # => {"message":"Pong!"}
 ```
 
-### Register & login (TypeScript example)
+### Register & login (TypeScript)
 
 ```typescript
 import axios from 'axios';
@@ -263,4 +268,146 @@ await axios.post(
 
 ```typescript
 await axios.post(
-  'http://
+  'http://localhost:9000/api/bot/updateControlledBotStyle',
+  {
+    botId: '64b2d3e4f5a6b7c8d9e0f1a2',
+    style: {
+      primaryColor: '#4A90E2',
+      bubbleShape: 'rounded',
+      welcomeMessage: 'Hello! How can I help you today?'
+    }
+  },
+  {
+    headers: { Cookie: `refreshToken=${refreshToken}` },
+    withCredentials: true,
+  }
+);
+```
+
+---  
+
+## API Documentation  
+
+All routes are prefixed with `/api`. The API follows REST conventions and returns JSON.
+
+### Authentication  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/auth/register` | Register a new user (email + password). | ❌ |
+| `POST` | `/auth/login` | Login and receive `accessToken` & `refreshToken`. | ❌ |
+| `POST` | `/auth/refresh` | Refresh an expired access token. | ✅ (refresh token cookie) |
+| `POST` | `/auth/logout` | Invalidate refresh token & clear cookie. | ✅ |
+
+### API‑Key Management  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/key/generate` | Generate a new API key for the authenticated user. | ✅ |
+| `GET` | `/api/key` | List all API keys belonging to the user. | ✅ |
+| `DELETE` | `/api/key/:keyId` | Revoke a specific API key. | ✅ |
+
+### Bot Management  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/bot` | Create a new bot (standard or controlled). | ✅ |
+| `GET` | `/api/bot/:botId` | Retrieve bot details. | ✅ |
+| `PATCH` | `/api/bot/:botId` | Update bot metadata or prompts. | ✅ |
+| `DELETE` | `/api/bot/:botId` | Delete a bot (soft‑delete, scheduled cleanup). | ✅ |
+| `POST` | `/api/bot/createControlledBot` | Shortcut for creating a website‑controlled bot. | ✅ |
+| `POST` | `/api/bot/updateControlledBotStyle` | Update visual style of a controlled bot. | ✅ |
+
+### AI Feature Management  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `PATCH` | `/api/bot/:botId/ai-features` | Enable/disable AI modules (`TextEnhancer`, `TextValidator`, …). | ✅ |
+
+### Bot Analytics  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `GET` | `/api/analytics/bot/:botId` | Retrieve aggregated usage statistics for a bot. | ✅ |
+| `GET` | `/api/analytics/user/:userId` | Get analytics across all bots owned by a user. | ✅ |
+
+### Website Bot Communication  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/website/bot/:botId/message` | Send a message to a website‑controlled bot and receive enriched response. | ✅ |
+| `GET` | `/api/website/bot/:botId/status` | Get real‑time status (online/offline, last activity). | ✅ |
+
+> **Note:** All protected routes require the `refreshToken` cookie (set on login) or a valid `Authorization: Bearer <accessToken>` header.
+
+---  
+
+## Development  
+
+### Setting up the development environment  
+
+```bash
+# Install dev dependencies (already done in the main install step)
+npm ci
+
+# Run linting
+npm run lint
+
+# Run tests
+npm test
+```
+
+### Running tests  
+
+```bash
+npm run test          # Jest unit & integration tests
+npm run test:watch    # Watch mode
+```
+
+### Code style  
+
+* **Prettier** – automatically formats files (`npm run format`).  
+* **ESLint** – enforces best practices (`npm run lint`).  
+
+### Debugging  
+
+* Use `DEBUG=app:* npm run dev` to enable verbose logging.  
+* The `LOG_LEVEL` env variable can be set to `debug` for more granular output.
+
+---  
+
+## Deployment  
+
+### Production build  
+
+```bash
+npm run build   # Compiles TypeScript to ./dist
+npm start       # Runs compiled code with Node
+```
+
+### Docker deployment (recommended)  
+
+```bash
+docker build -t nova-bot-studio-backend .
+docker run -d -p 9000:9000 \
+  --env-file .env \
+  --restart unless-stopped \
+  nova-bot-studio-backend
+```
+
+### Cloud platforms  
+
+* **Heroku / Render** – Use the Dockerfile or the `npm start` command.  
+* **AWS ECS / Fargate** – Deploy the Docker image; configure environment variables via task definition.  
+
+### Performance considerations  
+
+* Enable **Redis** for API‑key look‑ups and session storage to minimise DB round‑trips.  
+* Tune PostgreSQL `MAX_POOL_SIZE` according to expected concurrency.  
+* Use the **DeleteBotScheduler** to purge soft‑deleted bots after 30 days.
+
+---  
+
+## Contributing  
+
+We welcome contributions! Please follow
