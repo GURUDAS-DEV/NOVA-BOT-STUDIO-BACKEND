@@ -111,7 +111,7 @@ src/
 └─ tsconfig.json
 ```
 
-*The `BackgroundWorker` directory now houses the `ScraperWorker` which processes the `scrapeWebsite` queue, normalises HTML, creates text chunks, generates embeddings, stores them, and notifies users via email.*  
+*The `BackgroundWorker` directory houses the `ScraperWorker` which processes the `scrapeWebsite` queue, normalises HTML, creates text chunks, generates embeddings, stores them, and notifies users via email.*  
 
 ---  
 
@@ -254,7 +254,7 @@ await axios.get('http://localhost:9000/api/bot/', {
   headers: { Cookie: `refreshToken=${refreshToken}` },
   withCredentials: true,
 });
-``
+```
 
 ### Enqueue a web‑scraping job  
 
@@ -340,24 +340,4 @@ All routes are prefixed with `/api`. The API follows REST conventions and return
 |--------|----------|-------------|------|
 | `POST` | `/api/bot` | Create a new bot (standard or controlled). | ✅ |
 | `GET` | `/api/bot/:botId` | Retrieve bot details. | ✅ |
-| `PATCH` | `/api/bot/:botId` | Update bot metadata or prompts. | ✅ |
-| `DELETE` | `/api/bot/:botId` | Delete a bot (soft‑delete, scheduled cleanup). | ✅ |
-| `POST` | `/api/bot/createControlledBot` | Shortcut for creating a website‑controlled bot. | ✅ |
-| `POST` | `/api/bot/updateControlledBotStyle` | Update visual style of a controlled bot. | ✅ |
-
-### AI Feature Management  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `PATCH` | `/api/bot/:botId/ai-features` | Enable/disable AI modules (`TextEnhancer`, `TextValidator`, …). | ✅ |
-
-### Bot Analytics  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `GET` | `/api/analytics/bot/:botId` | Retrieve aggregated usage statistics for a bot. | ✅ |
-| `GET` | `/api/analytics/user/:userId` | Get analytics across all bots owned by a user. | ✅ |
-
-### Website Bot Communication  
-
-| Method | Endpoint
+| `PATCH` | `/api/bot/:botId` | Update bot metadata or prompts. |
