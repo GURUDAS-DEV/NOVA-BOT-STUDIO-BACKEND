@@ -840,9 +840,10 @@ export const detectBotTypeController = async(req : Request, res : Response) : Pr
 
 export const scrapWebsiteForBotController = async(req : Request, res : Response) : Promise<Response> =>{
   try{
-
-    const { url, botId, userId } = req.body;
-    // const userId = (req as any).user?.userId;
+    console.log("Received request ");
+    const { url, botId } = req.body;
+    const userId = (req as any).user?.userId;
+    console.log("Received request to scrape website with data:", { url, botId, userId });
     
     if(!url || !botId){
       return res.status(400).json({ message : "URL and BotId is required!"});

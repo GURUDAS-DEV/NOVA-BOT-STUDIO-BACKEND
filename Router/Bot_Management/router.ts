@@ -25,6 +25,6 @@ BotManagementRouter.post("/setupWebsiteControlledStyleBotConfig", authMiddleware
 
 BotManagementRouter.post("/detectBotType", authMiddleware, detectBotTypeController);
 
-BotManagementRouter.post("/ScrapeWebsiteForBot", scrapWebsiteForBotController);
+BotManagementRouter.post("/ScrapeWebsiteForBot", authMiddleware,  scrapWebsiteForBotController);
 
 export default BotManagementRouter;
