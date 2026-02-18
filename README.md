@@ -2,7 +2,7 @@
 
 ![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue) ![Version](https://img.shields.io/github/v/tag/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND?label=version)
 
-**A modular, TypeScript‑based backend for managing AI bots, API keys, user authentication, and bot analytics.**  
+**A modular, TypeScript‑based backend for managing AI bots, API keys, user authentication, bot analytics, and background web‑scraping jobs.**  
 
 ---  
 
@@ -18,8 +18,9 @@ NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for buildin
 * **Multi‑database support** – PostgreSQL for relational data, MongoDB for flexible storage.  
 * **Redis integration** – fast look‑ups for API‑key validation, session data, and real‑time website‑bot communication.  
 * **Controlled bots** – lightweight, website‑hosted bots with a dedicated schema and management endpoints.  
+* **Background web‑scraping** – asynchronous scraping, chunking, embedding generation, and email notifications via BullMQ workers.  
 
-Targeted at developers building SaaS bot platforms, internal automation tools, or any service that needs programmable bots with fine‑grained access control and insight into bot performance.  
+Targeted at developers building SaaS bot platforms, internal automation tools, or any service that needs programmable bots with fine‑grained access control, insight into bot performance, and automated content ingestion.
 
 ---  
 
@@ -37,6 +38,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats. | ✅ Stable |
 | **Multi‑DB Support** | PostgreSQL (`pg`) & MongoDB (`mongoose`). | ✅ Stable |
 | **Redis Caching** | Centralised client for API‑key validation, session storage, and bot messaging. | ✅ Stable |
+| **Background Scraping & Embedding** | BullMQ worker scrapes URLs with Playwright, normalises text, creates chunks, generates embeddings, stores them in Supabase, and sends success/failure emails via Resend. | ✅ Stable |
 | **CORS Configuration** | Whitelisted origins with credentials support. | ✅ Stable |
 | **Testing Utilities** | Ready‑made test router and controller for CI pipelines. | ✅ Stable |
 | **System Prompt Utilities** | Re‑usable helpers (`TextEnhancer`, `TextValidator`, `ExampleValidator`, `Website`) for building robust AI prompts. | ✅ Stable |
@@ -54,6 +56,8 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Cache** | Redis (`ioredis`) | Fast key‑value look‑ups for API‑key validation & bot messaging |
 | **Authentication** | `jsonwebtoken`, `bcrypt` | Secure token handling |
 | **Validation / Sanitisation** | `class-validator`, custom sanitiser helpers | Prevent injection attacks |
+| **Background Jobs** | BullMQ, Playwright, Resend | Reliable job queue, headless browsing, email notifications |
+| **Embedding Store** | Supabase (PostgreSQL) | Vector storage for generated embeddings |
 | **Testing** | Jest & Supertest | Unit & integration testing |
 | **Containerisation** | Docker | Consistent dev/prod environments |
 | **CI/CD** | GitHub Actions | Automated lint, test, build pipelines |
@@ -96,6 +100,7 @@ src/
 │   ├─ JWT/                   # Token generation & validation
 │   ├─ System_Prompt/         # Prompt‑related helpers
 │   ├─ helper/                # Misc. utilities (API‑key, sanitising, etc.)
+│   ├─ BackgroundWorker/      # BullMQ workers (e.g., ScraperWorker)
 │   └─ types/                 # Shared TypeScript types
 ├─ Database/                  # DB connection wrappers (PostgreSQL & MongoDB)
 ├─ Redis/                     # Redis client singleton
@@ -105,6 +110,8 @@ src/
 ├─ index.ts                   # Application entry point
 └─ tsconfig.json
 ```
+
+*The `BackgroundWorker` directory now houses the `ScraperWorker` which processes the `scrapeWebsite` queue, normalises HTML, creates text chunks, generates embeddings, stores them, and notifies users via email.*  
 
 ---  
 
@@ -120,6 +127,7 @@ src/
 | MongoDB | 5 |
 | Redis | 6 |
 | Docker (optional) | 20.10+ |
+| Playwright browsers | (installed via `npm i -D playwright`) |
 
 ### Installation  
 
@@ -133,13 +141,13 @@ npm ci   # or `yarn install`
 
 # 3️⃣ Create environment file
 cp .env.example .env
-# Edit .env with your DB credentials, JWT secrets, etc.
+# Edit .env with your DB credentials, JWT secrets, RESEND_MAIL_API_KEY, etc.
 ```
 
 ### Database setup  
 
 * **PostgreSQL** – Tables are created automatically on first run via the `pg` client.  
-* **MongoDB** – Collections are created on demand; ensure the database exists.
+* **MongoDB** – Collections are created on demand; ensure the database exists.  
 
 ### Running locally (development)  
 
@@ -186,6 +194,8 @@ docker run -d -p 9000:9000 \
 | `SESSION_TTL_SECONDS` | Redis TTL for session entries | `86400` |
 | `MAX_POOL_SIZE` | PostgreSQL connection pool size | `20` |
 | `LOG_LEVEL` | Application log level (`error`, `warn`, `info`, `debug`) | `info` |
+| `RESEND_MAIL_API_KEY` | API key for Resend (email notifications) | `re_1234567890abcdef` |
+| `BULLMQ_CONNECTION_URL` | URL for BullMQ Redis connection (defaults to `REDIS_URL`) | `redis://localhost:6379` |
 
 **Example `.env` snippet**
 
@@ -201,6 +211,7 @@ API_KEY_SALT_ROUNDS=12
 SESSION_TTL_SECONDS=86400
 MAX_POOL_SIZE=20
 LOG_LEVEL=info
+RESEND_MAIL_API_KEY=your-resend-api-key
 ```
 
 ---  
@@ -243,7 +254,24 @@ await axios.get('http://localhost:9000/api/bot/', {
   headers: { Cookie: `refreshToken=${refreshToken}` },
   withCredentials: true,
 });
+``
+
+### Enqueue a web‑scraping job  
+
+```typescript
+import { Queue } from 'bullmq';
+import { connection } from '../utils/BullMQ/BullMq';
+
+const scrapeQueue = new Queue('scrapeWebsite', { connection });
+
+await scrapeQueue.add('scrape', {
+  url: 'https://example.com/article',
+  userId: '64a1f2c9e5b6c8d1f0a2b3c4',
+  botId: '64b2d3e4f5a6b7c8d9e0f1a2',
+});
 ```
+
+The `ScraperWorker` will pick up the job, process it, store embeddings, and send a success/failure email to the address configured in `RESEND_MAIL_API_KEY`.
 
 ### Create a **controlled website bot**
 
@@ -253,9 +281,8 @@ await axios.post(
   {
     name: 'SupportBot',
     userId: '64a1f2c9e5b6c8d1f0a2b3c4',
-    platform: 'Website',          // optional – defaults to Website
+    platform: 'Website',
     type: 'CONTROLLED',
-    // entryNodeId can be omitted for a fresh bot
   },
   {
     headers: { Cookie: `refreshToken=${refreshToken}` },
@@ -333,81 +360,4 @@ All routes are prefixed with `/api`. The API follows REST conventions and return
 
 ### Website Bot Communication  
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/api/website/bot/:botId/message` | Send a message to a website‑controlled bot and receive enriched response. | ✅ |
-| `GET` | `/api/website/bot/:botId/status` | Get real‑time status (online/offline, last activity). | ✅ |
-
-> **Note:** All protected routes require the `refreshToken` cookie (set on login) or a valid `Authorization: Bearer <accessToken>` header.
-
----  
-
-## Development  
-
-### Setting up the development environment  
-
-```bash
-# Install dev dependencies (already done in the main install step)
-npm ci
-
-# Run linting
-npm run lint
-
-# Run tests
-npm test
-```
-
-### Running tests  
-
-```bash
-npm run test          # Jest unit & integration tests
-npm run test:watch    # Watch mode
-```
-
-### Code style  
-
-* **Prettier** – automatically formats files (`npm run format`).  
-* **ESLint** – enforces best practices (`npm run lint`).  
-
-### Debugging  
-
-* Use `DEBUG=app:* npm run dev` to enable verbose logging.  
-* The `LOG_LEVEL` env variable can be set to `debug` for more granular output.
-
----  
-
-## Deployment  
-
-### Production build  
-
-```bash
-npm run build   # Compiles TypeScript to ./dist
-npm start       # Runs compiled code with Node
-```
-
-### Docker deployment (recommended)  
-
-```bash
-docker build -t nova-bot-studio-backend .
-docker run -d -p 9000:9000 \
-  --env-file .env \
-  --restart unless-stopped \
-  nova-bot-studio-backend
-```
-
-### Cloud platforms  
-
-* **Heroku / Render** – Use the Dockerfile or the `npm start` command.  
-* **AWS ECS / Fargate** – Deploy the Docker image; configure environment variables via task definition.  
-
-### Performance considerations  
-
-* Enable **Redis** for API‑key look‑ups and session storage to minimise DB round‑trips.  
-* Tune PostgreSQL `MAX_POOL_SIZE` according to expected concurrency.  
-* Use the **DeleteBotScheduler** to purge soft‑deleted bots after 30 days.
-
----  
-
-## Contributing  
-
-We welcome contributions! Please follow
+| Method | Endpoint
