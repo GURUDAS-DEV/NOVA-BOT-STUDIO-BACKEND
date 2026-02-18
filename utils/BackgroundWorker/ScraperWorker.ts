@@ -74,7 +74,7 @@ const bootstrapWorker = async (): Promise<void> => {
                     to: "gursad5@gmail.com",
                     subject: "Nova Bot Studio - Scraping Completed",
                     html: buildScrapingDoneEmail(url),
-                });
+                }); 
             }
             catch (e) {
                 const message = e instanceof Error ? e.message : String(e);
