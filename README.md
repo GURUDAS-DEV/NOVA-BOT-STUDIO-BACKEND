@@ -24,6 +24,16 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 ---  
 
+## Changelog  
+
+| Version | Date | Description |
+|---------|------|-------------|
+| `v1.2.0` | 2026‑02‑20 | Refactored several internal methods for clearer naming and improved testability. No breaking API changes. Updated architecture diagram and documentation to reflect the corrected `Bot_Configuration` folder name. |
+| `v1.1.0` | 2025‑11‑12 | Added richer website‑bot communication helpers and `/communicate` endpoint. |
+| `v1.0.0` | 2025‑08‑01 | Initial public release. |
+
+---  
+
 ## Features  
 
 | Feature | Description | Status |
@@ -73,7 +83,7 @@ src/
 │   ├─ authentication/
 │   ├─ API_Key_Management/
 │   ├─ Bot_Management/
-│   ├─ Bot_Configration/
+│   ├─ Bot_Configuration/      # ← renamed from Bot_Configration
 │   ├─ AI_Feature_Management/
 │   ├─ AdvanceBotManagement/
 │   ├─ BotAnalyticsManagement/
@@ -84,7 +94,7 @@ src/
 │   ├─ Authentication/
 │   ├─ API_Key_Management/
 │   ├─ Bot_Management/
-│   ├─ Bot_Configration/
+│   ├─ Bot_Configuration/      # ← renamed from Bot_Configration
 │   ├─ AI_Feature_Management/
 │   ├─ Advance_Bot_Management/
 │   ├─ BotAnalytics/
@@ -317,51 +327,4 @@ await axios.post(
 await axios.post(
   'http://localhost:9000/api/bot/website/communicate',
   {
-    botId: '64b2d3e4f5a6b7c8d9e0f1a2',
-    userMessage: 'What are your opening hours?'
-  },
-  {
-    headers: { Cookie: `refreshToken=${refreshToken}` },
-    withCredentials: true,
-  }
-).then(res => {
-  console.log('Bot reply:', res.data.reply);
-});
-```
-
-The endpoint leverages the new `Website` controller helpers (`freeStyleWebsiteBotPrompt`, `getToolDefinitions`, `fetchData`, etc.) and returns a structured reply together with any tool‑generated data.
-
----  
-
-## API Documentation  
-
-All routes are prefixed with `/api`. The API follows REST conventions and returns JSON.
-
-### Authentication  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/auth/register` | Register a new user (email + password). | ❌ |
-| `POST` | `/auth/login` | Login and receive `accessToken` & `refreshToken`. | ❌ |
-| `POST` | `/auth/refresh` | Refresh an expired access token. | ✅ (refresh token cookie) |
-| `POST` | `/auth/logout` | Invalidate refresh token & clear cookie. | ✅ |
-
-### API‑Key Management  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/api/key/generate` | Generate a new API key for the authenticated user. | ✅ |
-| `GET` | `/api/key` | List all API keys belonging to the user. | ✅ |
-| `DELETE` | `/api/key/:keyId` | Revoke a specific API key. | ✅ |
-
-### Bot Management  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/api/bot` | Create a new bot (metadata, prompts, etc.). | ✅ |
-| `GET` | `/api/bot/:botId` | Retrieve bot details. | ✅ |
-| `PUT` | `/api/bot/:botId` | Update bot configuration. | ✅ |
-| `DELETE` | `/api/bot/:botId` | Delete a bot (soft‑delete, triggers scheduler). | ✅ |
-| `POST` | `/api/bot/createControlledBot` | Create a lightweight website‑controlled bot. | ✅ |
-| `POST` | `/api/bot/updateControlledBotStyle` | Update visual style for a controlled bot. | ✅ |
-| `POST` | `/api/bot/website/communicate`
+    botId: '64b2d3e4f5a
