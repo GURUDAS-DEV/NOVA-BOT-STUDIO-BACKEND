@@ -1,6 +1,6 @@
 # NOVA‑BOT‑STUDIO‑BACKEND  
 
-![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue) ![Version](https://img.shields.io/github/v/tag/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND?label=version)
+![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue) ![Version](https://img.shields.io/github/v/tag/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND?label=version)  
 
 **A modular, TypeScript‑based backend for managing AI bots, API keys, user authentication, bot analytics, and background web‑scraping jobs.**  
 
@@ -331,34 +331,4 @@ await axios.post(
     message: 'What are your business hours?'
   },
   {
-    headers: { Cookie: `refreshToken=${refreshToken}` },
-    withCredentials: true,
-  }
-);
-```
-
----  
-
-## Development  
-
-### Setting up the development environment  
-
-1. Follow the **Installation** steps above.  
-2. Install development dependencies (already covered by `npm ci`).  
-3. Enable hot‑reloading with `npm run dev`.  
-
-### Running tests  
-
-```bash
-npm test          # runs Jest unit & integration tests
-npm run test:e2e  # optional: run end‑to‑end tests (if configured)
-```
-
-### Code style  
-
-* Use **Prettier** (`npm run format`) and **ESLint** (`npm run lint`).  
-* All new code should have explicit TypeScript types; avoid `any`.  
-
-### Debugging tips  
-
-* Logs are emitted via `winston` (or console) respecting the `LOG_LEVEL` env var.  
+    headers: { Cookie: `refreshToken=${refreshToken}`
