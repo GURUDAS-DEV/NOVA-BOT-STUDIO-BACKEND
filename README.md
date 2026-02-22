@@ -13,7 +13,7 @@ NOVA‑BOT‑STUDIO‑BACKEND provides a clean, extensible framework for buildin
 * **Bot lifecycle management** – create, update, delete, and run bots.  
 * **AI feature toggling** – enable/disable advanced AI capabilities per bot.  
 * **Secure API‑key handling** – generation, hashing, revocation with Redis‑backed caching.  
-* **Robust authentication** – JWT‑based login/registration with refresh tokens and role‑based middleware.  
+* **Robust authentication** – JWT‑based login/registration with refresh tokens, role‑based middleware, and stricter cookie validation.  
 * **Bot analytics** – collect, store, and query usage metrics per bot.  
 * **Multi‑database support** – PostgreSQL for relational data, MongoDB for flexible storage.  
 * **Redis integration** – fast look‑ups for API‑key validation, session data, and real‑time website‑bot communication.  
@@ -28,12 +28,12 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Authentication** | JWT login, registration, refresh tokens, role‑based middleware. | ✅ Stable |
+| **Authentication** | JWT login, registration, refresh tokens, role‑based middleware. Now validates presence of `sessionId` and clears stale `accessToken` cookies automatically. | ✅ Stable |
 | **API‑Key Management** | Secure generation, hashing, revocation, Redis‑backed lookup. | ✅ Stable |
 | **Bot Configuration** | CRUD for bot metadata, custom prompts, and system settings. | ✅ Stable |
 | **AI Feature Management** | Toggle AI modules (`TextEnhancer`, `TextValidator`, etc.) per bot. | ✅ Stable |
 | **Advanced Bot Management** | Lifecycle helpers, scheduled clean‑up, versioning. | ✅ Stable |
-| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. | ✅ Stable |
+| **Website Bot Communication** | Real‑time interaction endpoints backed by Redis for sub‑millisecond latency. Added richer helper utilities and new `/communicate` endpoint for website‑controlled bots. | ✅ Stable |
 | **Controlled Bot Management** | Create lightweight “website‑controlled” bots, configure style, and retrieve details via dedicated routes. | ✅ Stable |
 | **Bot Analytics** | Capture events (messages sent, errors, usage time) and expose aggregated stats. | ✅ Stable |
 | **Multi‑DB Support** | PostgreSQL (`pg`) & MongoDB (`mongoose`). | ✅ Stable |
@@ -54,7 +54,7 @@ Targeted at developers building SaaS bot platforms, internal automation tools, o
 | **Web Framework** | Express 4 | Minimalist, middleware‑centric |
 | **Database** | PostgreSQL (`pg`) & MongoDB (`mongoose`) | Relational + flexible document storage |
 | **Cache** | Redis (`ioredis`) | Fast key‑value look‑ups for API‑key validation & bot messaging |
-| **Authentication** | `jsonwebtoken`, `bcrypt` | Secure token handling |
+| **Authentication** | `jsonwebtoken`, `bcrypt-ts` | Secure token handling |
 | **Validation / Sanitisation** | `class-validator`, custom sanitiser helpers | Prevent injection attacks |
 | **Background Jobs** | BullMQ, Playwright, Resend | Reliable job queue, headless browsing, email notifications |
 | **Embedding Store** | Supabase (PostgreSQL) | Vector storage for generated embeddings |
@@ -78,7 +78,7 @@ src/
 │   ├─ AdvanceBotManagement/
 │   ├─ BotAnalyticsManagement/
 │   ├─ BotCommunication/
-│   │   └─ Website/
+│   │   └─ Website/          # New helpers & richer communication flow
 │   └─ Testing/
 ├─ Router/                    # Express routers – one per domain
 │   ├─ Authentication/
@@ -311,6 +311,26 @@ await axios.post(
 );
 ```
 
+### Communicate with a website‑controlled bot  
+
+```typescript
+await axios.post(
+  'http://localhost:9000/api/bot/website/communicate',
+  {
+    botId: '64b2d3e4f5a6b7c8d9e0f1a2',
+    userMessage: 'What are your opening hours?'
+  },
+  {
+    headers: { Cookie: `refreshToken=${refreshToken}` },
+    withCredentials: true,
+  }
+).then(res => {
+  console.log('Bot reply:', res.data.reply);
+});
+```
+
+The endpoint leverages the new `Website` controller helpers (`freeStyleWebsiteBotPrompt`, `getToolDefinitions`, `fetchData`, etc.) and returns a structured reply together with any tool‑generated data.
+
 ---  
 
 ## API Documentation  
@@ -331,13 +351,4 @@ All routes are prefixed with `/api`. The API follows REST conventions and return
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
 | `POST` | `/api/key/generate` | Generate a new API key for the authenticated user. | ✅ |
-| `GET` | `/api/key` | List all API keys belonging to the user. | ✅ |
-| `DELETE` | `/api/key/:keyId` | Revoke a specific API key. | ✅ |
-
-### Bot Management  
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| `POST` | `/api/bot` | Create a new bot (standard or controlled). | ✅ |
-| `GET` | `/api/bot/:botId` | Retrieve bot details. | ✅ |
-| `PATCH` | `/api/bot/:botId` | Update bot metadata or prompts. |
+| `GET` | `/api/key` | List all API keys belonging to the user. |
