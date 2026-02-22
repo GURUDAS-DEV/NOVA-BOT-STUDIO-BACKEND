@@ -351,4 +351,17 @@ All routes are prefixed with `/api`. The API follows REST conventions and return
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
 | `POST` | `/api/key/generate` | Generate a new API key for the authenticated user. | ✅ |
-| `GET` | `/api/key` | List all API keys belonging to the user. |
+| `GET` | `/api/key` | List all API keys belonging to the user. | ✅ |
+| `DELETE` | `/api/key/:keyId` | Revoke a specific API key. | ✅ |
+
+### Bot Management  
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| `POST` | `/api/bot` | Create a new bot (metadata, prompts, etc.). | ✅ |
+| `GET` | `/api/bot/:botId` | Retrieve bot details. | ✅ |
+| `PUT` | `/api/bot/:botId` | Update bot configuration. | ✅ |
+| `DELETE` | `/api/bot/:botId` | Delete a bot (soft‑delete, triggers scheduler). | ✅ |
+| `POST` | `/api/bot/createControlledBot` | Create a lightweight website‑controlled bot. | ✅ |
+| `POST` | `/api/bot/updateControlledBotStyle` | Update visual style for a controlled bot. | ✅ |
+| `POST` | `/api/bot/website/communicate`
