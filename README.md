@@ -151,7 +151,7 @@ npm ci   # or `yarn install`
 
 # 3️⃣ Create environment file
 cp .env.example .env
-# Edit .env with your DB credentials, JWT secrets, RESEND_MAIL_API_KEY, etc.
+# Edit .env with your DB credentials, JWT secrets, Resend API key, etc.
 ```
 
 ### Database setup  
@@ -327,4 +327,38 @@ await axios.post(
 await axios.post(
   'http://localhost:9000/api/bot/website/communicate',
   {
-    botId: '64b2d3e4f5a
+    botId: '64b2d3e4f5a6b7c8d9e0f1a2',
+    message: 'What are your business hours?'
+  },
+  {
+    headers: { Cookie: `refreshToken=${refreshToken}` },
+    withCredentials: true,
+  }
+);
+```
+
+---  
+
+## Development  
+
+### Setting up the development environment  
+
+1. Follow the **Installation** steps above.  
+2. Install development dependencies (already covered by `npm ci`).  
+3. Enable hot‑reloading with `npm run dev`.  
+
+### Running tests  
+
+```bash
+npm test          # runs Jest unit & integration tests
+npm run test:e2e  # optional: run end‑to‑end tests (if configured)
+```
+
+### Code style  
+
+* Use **Prettier** (`npm run format`) and **ESLint** (`npm run lint`).  
+* All new code should have explicit TypeScript types; avoid `any`.  
+
+### Debugging tips  
+
+* Logs are emitted via `winston` (or console) respecting the `LOG_LEVEL` env var.  
