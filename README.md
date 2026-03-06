@@ -1,6 +1,6 @@
 # NOVA‑BOT‑STUDIO‑BACKEND  
 
-![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue) ![Version](https://img.shields.io/github/v/tag/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND?label=version)
+![Node.js](https://img.shields.io/badge/Node.js-18.x-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue) ![License](https://img.shields.io/badge/License-MIT-yellow) ![Build](https://img.shields.io/github/actions/workflow/status/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND/ci.yml?branch=main) ![Coverage](https://img.shields.io/codecov/c/github/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND) ![Docker](https://img.shields.io/badge/Docker-✓-blue) ![Version](https://img.shields.io/github/v/tag/GURUDAS-DEV/NOVA-BOT-STUDIO-BACKEND?label=version)  
 
 **A modular, TypeScript‑based backend for managing AI bots, API keys, user authentication, bot analytics, and background web‑scraping jobs.**  
 
@@ -151,7 +151,7 @@ npm ci   # or `yarn install`
 
 # 3️⃣ Create environment file
 cp .env.example .env
-# Edit .env with your DB credentials, JWT secrets, RESEND_MAIL_API_KEY, etc.
+# Edit .env with your DB credentials, JWT secrets, Resend API key, etc.
 ```
 
 ### Database setup  
@@ -327,4 +327,8 @@ await axios.post(
 await axios.post(
   'http://localhost:9000/api/bot/website/communicate',
   {
-    botId: '64b2d3e4f5a
+    botId: '64b2d3e4f5a6b7c8d9e0f1a2',
+    message: 'What are your business hours?'
+  },
+  {
+    headers: { Cookie: `refreshToken=${refreshToken}`
