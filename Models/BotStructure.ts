@@ -47,6 +47,19 @@ const botStructureSchema = new Schema<BotStructureType>({
         enum: ["notOpted", "running", "completed", "failed"],
         default: "notOpted",
     },
+    // Telegram specific fields (optional)
+    botToken: {
+        type: String,
+        required: false,
+    },
+    webhookUrl: {
+        type: String,
+        required: false,
+    },
+    webhookRegistered: {
+        type: Boolean,
+        default: false,
+    },
     updated_at: {
         type: Date,
         default: Date.now,

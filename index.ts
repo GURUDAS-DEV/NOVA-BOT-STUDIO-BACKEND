@@ -15,6 +15,7 @@ import { getRedisClient } from './Redis/connect.js';
 import communcationWithBotRouter from './Router/CommunicationWithBot/Website/router.js';
 import { botAnalyticsRouter } from './Router/BotAnalytics/router.js';
 import { deleteScheduler } from './Schedulers/DeleteBotScheduler.js';
+import TelegramBotRouter from './Router/Telegram/router.js';
 dotenv.config();
 
 const app = express();
@@ -51,7 +52,7 @@ app.use("/api/botConfig/", BotConfigrationRouter);
 app.use("/api/advanceBotController", advanceBotRouter);
 app.use("/api/APIKeyManagement", APIKeyRouter);
 app.use("/api/botAnalytics", botAnalyticsRouter)
-app.use("/api/testing", TestingRouter);
+app.use("/api/Telegram", TelegramBotRouter);
 
 //communcation with website bot : 
 app.use("/v1/websiteBot/", communcationWithBotRouter);

@@ -13,4 +13,7 @@ export interface BotStructureType extends mongoose.Document {
     created_at ?: Date;
     updated_at ?: Date;
     deleted_at  ?: Date | null;
+    botToken ?: string; // Telegram specific
+    webhookUrl ?: string; // Telegram specific
+    webhookRegistered ?: boolean; // Telegram specific
 }
