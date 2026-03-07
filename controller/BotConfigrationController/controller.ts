@@ -55,7 +55,6 @@ export const setConfigController = async (req: Request, res: Response): Promise<
         const newBotConfig = await botConfiguration.insertOne({
             botId, 
             userId,
-            style : botStyle || 'free-style',
             config : {
                 botType, websiteType: websiteContext, tone, verbosity, behaviorDescription, OwnerInformation, additionalInformation, examples, apiEndpoint, responseFormat, apiUsageRules
             },

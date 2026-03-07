@@ -853,6 +853,7 @@ export const scrapWebsiteForBotController = async(req : Request, res : Response)
 
     const existingScrapeStatus = await BotStructureModel.findOne({ _id: botId, userId }, { "scrapeStatus": 1 });
     if(existingScrapeStatus?.scrapeStatus === "running" || existingScrapeStatus?.scrapeStatus === "completed"){
+      console.log("Scraping already in progress or completed for botId:", botId, "Current scrapeStatus:", existingScrapeStatus?.scrapeStatus);
       return res.status(400).json({ message : "Scraping is already running or has been completed for this bot!"});
     }
 

@@ -15,7 +15,9 @@ const bootstrapWorker = async (): Promise<void> => {
 
     const worker = new Worker('scrapeWebsite',
         async (job) => {
-            const { url, userId, botId } = job.data;
+            const { url, botId } = job.data;
+            console.log(`Worker started processing job for URL: ${url}, Bot ID: ${botId}`); 
+            
             const resend = new Resend(process.env.RESEND_MAIL_API_KEY);
 
             const markFailed = async (reason: string): Promise<void> => {
@@ -27,7 +29,7 @@ const bootstrapWorker = async (): Promise<void> => {
                     html: buildScrapingFailEmail(url, reason),
                 });
             };
-
+            
             try {
                 // 1) Update the scraping status to "running" in the database
                 await updateScrapingStatus(botId, "running");

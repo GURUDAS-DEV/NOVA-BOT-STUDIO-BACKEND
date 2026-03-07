@@ -11,12 +11,6 @@ const botConfigurationSchema = new Schema({
         type : String,
         required : true
     },
-    style : {
-        type : String,
-        enum : ['free-style', 'controlled-style'],
-        required : true,
-        default : 'free-style',
-    },
     version : {
         type : String,
         required : true,
@@ -30,7 +24,20 @@ const botConfigurationSchema = new Schema({
         type : String,
         enum : ['setup', 'config'],
         default : 'setup',
-    }
+    }, 
+    // Telegram specific fields (optional)
+    botToken: {
+        type: String,
+        required: false,
+    },
+    webhookUrl: {
+        type: String,
+        required: false,
+    },
+    webhookRegistered: {
+        type: Boolean,
+        default: false,
+    },
 }, {
     timestamps : true
 });

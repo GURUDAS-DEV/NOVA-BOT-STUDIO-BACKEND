@@ -28,10 +28,18 @@ export const startBotController = async(req : Request, res : Response) : Promise
             return res.status(403).json({ message : "Unauthorized access to the bot."});
         }
 
+        if(botDetails.platform === "Telegram"){
+             botDetails.status = transistionBotLifecycle(botDetails.status, 'active');
+            await botDetails.save();
+            
+            return res.status(200).json({ message : "Telegram Bot started successfully." });
+        }
+
         const botConfig = await botConfiguration.find({botId : botId});
         if(!botConfig){
             return res.status(404).json({ message : "Bot configuration not found."});
         }
+        console.log("ENTERED")
         
         const Generated_API_KEY = generateAPIKey();
         const hashedApiKey = hashApiKey(Generated_API_KEY);
