@@ -9,13 +9,13 @@ const BotSchema = new Schema({
     enum: ["CONTROLLED"],
     required: true
   },
-  platform : {
+  platform: {
     type: String,
     enum: ['WhatsApp', 'Telegram', 'Discord', 'Instagram', 'Website'],
     required: true,
-    default : 'Website'
+    default: 'Website'
   },
-  currentState : {
+  currentState: {
     type: String,
     enum: ['setup', 'configure'],
     default: 'setup',
@@ -32,9 +32,21 @@ const BotSchema = new Schema({
     enum: ["draft", "active", "paused", "inactive", "deleted"],
     default: "draft"
   },
+  botToken: {
+    type: String,
+    required: false,
+  },
+  webhookUrl: {
+    type: String,
+    required: false,
+  },
+  webhookRegistered: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
-  deleted_at: { type: Date , default: null },
+  deleted_at: { type: Date, default: null },
 });
 
 export const ControlledBotModel = model("ControlledBot", BotSchema);

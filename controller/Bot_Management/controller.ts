@@ -476,27 +476,47 @@ export const getOneBotDetailsController = async (req: Request, res: Response): P
 
 export const createWebsiteControlledBot = async (req: Request, res: Response): Promise<Response> => {
   try{
-    const { userId, name, platform } = req.body;
+    const { userId, name, platform, botToken, webhookUrl, webhookRegistered } = req.body;
 
     if(!userId || !name || !platform){
       console.log("Missing required fields:", { userId, name, platform });
       return res.status(400).json({ message : "Required fields are missing"});
     }
 
+    const normalizedPlatform = typeof platform === "string" ? platform.trim() : platform;
+    const isTelegramControlledBot = normalizedPlatform === "Telegram";
+
+    if (isTelegramControlledBot) {
+      if (!botToken || !webhookUrl || typeof webhookRegistered !== "boolean") {
+        return res.status(400).json({
+          message: "For Telegram controlled bots, botToken, webhookUrl, and webhookRegistered are required.",
+        });
+      }
+    }
+
+    const telegramOnlyFields = isTelegramControlledBot
+      ? {
+          botToken,
+          webhookUrl,
+          webhookRegistered,
+        }
+      : {};
+
     const insertBotData = await ControlledBotModel.create({
       userId,
       name,
-      platform,
+      platform: normalizedPlatform,
       type : "CONTROLLED",
       entryNodeId : null,
       status : "draft",
       currentState : "setup",
+      ...telegramOnlyFields,
     });
 
     await insertBotData.save();
 
 
-    return res.status(200).json({ message : "Create Website Controlled Bot! ", botId : insertBotData._id });
+    return res.status(200).json({ message : "Controlled bot created successfully.", botId : insertBotData._id });
   }
 catch(e){
   return res.status(500).json({ message : "Internal Server Error!", e });
