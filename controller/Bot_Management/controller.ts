@@ -476,7 +476,7 @@ export const getOneBotDetailsController = async (req: Request, res: Response): P
 
 export const createWebsiteControlledBot = async (req: Request, res: Response): Promise<Response> => {
   try{
-    const { userId, name, platform, botToken, webhookUrl, webhookRegistered } = req.body;
+    const { userId, name, platform } = req.body;
 
     if(!userId || !name || !platform){
       console.log("Missing required fields:", { userId, name, platform });
@@ -484,23 +484,6 @@ export const createWebsiteControlledBot = async (req: Request, res: Response): P
     }
 
     const normalizedPlatform = typeof platform === "string" ? platform.trim() : platform;
-    const isTelegramControlledBot = normalizedPlatform === "Telegram";
-
-    if (isTelegramControlledBot) {
-      if (!botToken || !webhookUrl || typeof webhookRegistered !== "boolean") {
-        return res.status(400).json({
-          message: "For Telegram controlled bots, botToken, webhookUrl, and webhookRegistered are required.",
-        });
-      }
-    }
-
-    const telegramOnlyFields = isTelegramControlledBot
-      ? {
-          botToken,
-          webhookUrl,
-          webhookRegistered,
-        }
-      : {};
 
     const insertBotData = await ControlledBotModel.create({
       userId,
@@ -510,10 +493,8 @@ export const createWebsiteControlledBot = async (req: Request, res: Response): P
       entryNodeId : null,
       status : "draft",
       currentState : "setup",
-      ...telegramOnlyFields,
+      webhookRegistered: false,
     });
-
-    await insertBotData.save();
 
 
     return res.status(200).json({ message : "Controlled bot created successfully.", botId : insertBotData._id });
@@ -586,7 +567,7 @@ export const createWebsiteControlledStyleBotConfig = async (
     }
 
     // Step 2: Extract botId and bot object from request body
-    const { botId, bot } = req.body;
+    const { botId, bot, botToken } = req.body;
 
     if (!botId) {
       await session.abortTransaction();
@@ -616,6 +597,49 @@ export const createWebsiteControlledStyleBotConfig = async (
       return res.status(403).json({ message: "Forbidden: You don't have permission to configure this bot" });
     }
 
+    // Telegram controlled bots must provide a valid token at configuration time.
+    if (existingBot.platform === "Telegram") {
+      if (!botToken || typeof botToken !== "string" || !botToken.trim()) {
+        await session.abortTransaction();
+        return res.status(400).json({ message: "Telegram bot token is required during configuration." });
+      }
+
+      const normalizedBotToken = botToken.trim();
+      const tokenValidationResponse = await fetch(`https://api.telegram.org/bot${normalizedBotToken}/getMe`);
+      const tokenValidationData = await tokenValidationResponse.json().catch(() => ({}));
+
+      if (!tokenValidationResponse.ok || !tokenValidationData?.ok) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          message: "Invalid Telegram bot token.",
+          reason: tokenValidationData?.description || "Telegram rejected this token.",
+        });
+      }
+
+      // Register controlled-style webhook after token validation.
+      const baseUrl = process.env.TELEGRAM_WEBHOOK_BASE_URL || `${req.protocol}://${req.get("host")}`;
+      const webhookUrl = `${baseUrl.replace(/\/$/, "")}/api/Telegram/webhook/controlled/${existingBot._id}`;
+
+      const hookRes = await fetch(`https://api.telegram.org/bot${normalizedBotToken}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl }),
+      });
+
+      const hookData = await hookRes.json().catch(() => ({}));
+      if (!hookRes.ok || !hookData?.ok) {
+        await session.abortTransaction();
+        return res.status(400).json({
+          message: "Failed to register Telegram webhook.",
+          reason: hookData?.description || "Telegram rejected webhook registration.",
+        });
+      }
+
+      existingBot.botToken = normalizedBotToken;
+      existingBot.webhookUrl = webhookUrl;
+      existingBot.webhookRegistered = true;
+    }
+
     // Step 4: Build tempId → MongoDB ObjectId mapping for all nodes
     const tempIdToObjectId: Record<string, mongoose.Types.ObjectId> = {};
     bot.nodes.forEach((node: any) => {
@@ -634,8 +658,10 @@ export const createWebsiteControlledStyleBotConfig = async (
     // Update bot's entry node if it's still null
     if (!existingBot.entryNodeId) {
       (existingBot as any).entryNodeId = entryNodeObjectId;
-      await existingBot.save({ session });
     }
+
+    // Persist bot updates (entry node + telegram credentials/webhook metadata).
+    await existingBot.save({ session });
 
     // Step 6: Transform and insert nodes
     const nodeDocuments = bot.nodes.map((node: any) => {

@@ -103,7 +103,19 @@ const buildIssueMessage = (operation: string): string => {
     return `There was a problem while ${operation}. Please try again in a moment.`;
 };
 
-const sendTelegramTextMessage = async (botToken: string, chatId: string | number, text: string): Promise<boolean> => {
+type TelegramReplyMarkup = {
+    inline_keyboard?: Array<Array<{ text: string; callback_data: string }>>;
+    keyboard?: Array<Array<{ text: string }>>;
+    resize_keyboard?: boolean;
+    one_time_keyboard?: boolean;
+};
+
+const sendTelegramMessage = async (
+    botToken: string,
+    chatId: string | number,
+    text: string,
+    replyMarkup?: TelegramReplyMarkup
+): Promise<boolean> => {
     if (!botToken || !chatId || !text) {
         console.warn("[Telegram][sendMessage] Missing required input", {
             hasBotToken: Boolean(botToken),
@@ -114,15 +126,21 @@ const sendTelegramTextMessage = async (botToken: string, chatId: string | number
     }
 
     try {
+        const body: Record<string, unknown> = {
+            chat_id: chatId,
+            text,
+        };
+
+        if (replyMarkup) {
+            body.reply_markup = replyMarkup;
+        }
+
         const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                chat_id: chatId,
-                text,
-            })
+            body: JSON.stringify(body)
         });
         const data = await telegramResponse.json();
 
@@ -136,6 +154,10 @@ const sendTelegramTextMessage = async (botToken: string, chatId: string | number
         console.error("[Telegram][sendMessage] Exception while sending message", error);
         return false;
     }
+};
+
+const sendTelegramTextMessage = async (botToken: string, chatId: string | number, text: string): Promise<boolean> => {
+    return sendTelegramMessage(botToken, chatId, text);
 };
 
 const notifyTelegramIssue = async (botToken: string, chatId: string | number, operation?: string): Promise<void> => {
@@ -755,13 +777,132 @@ type TelegramControlledSession = {
     currentNodeId: string;
     previousNodeId: string | null;
     retryCount?: number;
+    variables?: Record<string, string>;
 };
 
-const parseTelegramControlledInput = (update: any): { chatId?: string | number; userInput?: string } => {
+const TEMPLATE_VAR_REGEX = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+
+const resolveTemplateString = (
+    value: string,
+    variables: Record<string, string>
+): { value: string; missingKeys: string[] } => {
+    const missingKeys = new Set<string>();
+    const resolved = value.replace(TEMPLATE_VAR_REGEX, (_, key: string) => {
+        const variableValue = variables[key];
+        if (variableValue === undefined || variableValue === null || variableValue === "") {
+            missingKeys.add(key);
+            return "";
+        }
+        return String(variableValue);
+    });
+
+    return { value: resolved, missingKeys: Array.from(missingKeys) };
+};
+
+const resolveDynamicQueryParams = (
+    queryParams: Record<string, any>,
+    variables: Record<string, string>
+): { params: Record<string, any>; missingKeys: string[] } => {
+    const resolvedParams: Record<string, any> = {};
+    const missingKeys = new Set<string>();
+    let usedTemplate = false;
+
+    Object.entries(queryParams || {}).forEach(([key, rawValue]) => {
+        if (typeof rawValue === "string") {
+            const resolved = resolveTemplateString(rawValue, variables);
+            if (/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/.test(rawValue)) {
+                usedTemplate = true;
+            }
+            resolved.missingKeys.forEach((k) => missingKeys.add(k));
+            resolvedParams[key] = resolved.value;
+            return;
+        }
+
+        resolvedParams[key] = rawValue;
+    });
+
+    // Legacy fallback: if no template was used, inject latest input into query params.
+    if (!usedTemplate) {
+        const lastInputKey = variables.__lastInputKey;
+        const lastInputValue = variables.__lastInputValue;
+
+        if (lastInputKey && lastInputValue) {
+            const placeholderLikeValues = new Set([
+                "string",
+                "number",
+                "text",
+                "value",
+                "input",
+                "required",
+                "dynamic",
+                "userinput",
+            ]);
+
+            // Override placeholder-like legacy values such as "String"/"Number".
+            Object.keys(resolvedParams).forEach((paramKey) => {
+                const paramValue = resolvedParams[paramKey];
+                if (typeof paramValue === "string") {
+                    const normalized = paramValue.trim().toLowerCase();
+                    if (placeholderLikeValues.has(normalized)) {
+                        resolvedParams[paramKey] = lastInputValue;
+                    }
+                }
+            });
+
+            if (resolvedParams[lastInputKey] === undefined || resolvedParams[lastInputKey] === "") {
+                resolvedParams[lastInputKey] = lastInputValue;
+            }
+
+            // If API config has exactly one empty param, fill it with latest input value.
+            const emptyKeys = Object.keys(resolvedParams).filter((key) => resolvedParams[key] === "" || resolvedParams[key] === null || resolvedParams[key] === undefined);
+            if (emptyKeys.length === 1) {
+                resolvedParams[emptyKeys[0] as string] = lastInputValue;
+            }
+
+            // If no query params exist at all, create one using input key.
+            if (Object.keys(resolvedParams).length === 0) {
+                resolvedParams[lastInputKey] = lastInputValue;
+            }
+        }
+    }
+
+    return { params: resolvedParams, missingKeys: Array.from(missingKeys) };
+};
+
+const getControlledReplyKeyboard = (): TelegramReplyMarkup => ({
+    keyboard: [[{ text: "/back" }, { text: "/end" }]],
+    resize_keyboard: true,
+    one_time_keyboard: false,
+});
+
+const sendControlledTextMessage = async (
+    botToken: string,
+    chatId: string | number,
+    text: string
+): Promise<boolean> => {
+    return sendTelegramMessage(botToken, chatId, text, getControlledReplyKeyboard());
+};
+
+const answerTelegramCallbackQuery = async (botToken: string, callbackQueryId?: string): Promise<void> => {
+    if (!botToken || !callbackQueryId) return;
+
+    try {
+        await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callback_query_id: callbackQueryId }),
+        });
+    } catch (error) {
+        console.warn("[Telegram][Controlled] Failed to answer callback query", error);
+    }
+};
+
+const parseTelegramControlledInput = (update: any): { chatId?: string | number; userInput?: string; callbackQueryId?: string } => {
     const callbackData = update?.callback_query?.data;
     const callbackChatId = update?.callback_query?.message?.chat?.id;
+    const callbackQueryId = update?.callback_query?.id;
     if (callbackData && callbackChatId) {
-        return { chatId: callbackChatId, userInput: String(callbackData) };
+        return { chatId: callbackChatId, userInput: String(callbackData), callbackQueryId };
     }
 
     const text = update?.message?.text;
@@ -864,12 +1005,20 @@ const resolveSelectedOption = (
     );
 };
 
-const executeControlledApiNode = async (node: any): Promise<string> => {
+const executeControlledApiNode = async (
+    node: any,
+    sessionVariables: Record<string, string> = {}
+): Promise<string> => {
     const reqInfo = extractApiRequestFromConfig(node?.apiConfig);
     if (!reqInfo) return "API configuration is missing for this node.";
 
     try {
-        const fullUrl = buildControlledApiUrl(reqInfo.endpoint, reqInfo.queryParams || {});
+        const resolvedQueryParams = resolveDynamicQueryParams(reqInfo.queryParams || {}, sessionVariables);
+        if (resolvedQueryParams.missingKeys.length > 0) {
+            return `Missing required input value(s): ${resolvedQueryParams.missingKeys.join(", ")}. Please provide valid input first.`;
+        }
+
+        const fullUrl = buildControlledApiUrl(reqInfo.endpoint, resolvedQueryParams.params || {});
         const response = await fetch(fullUrl, {
             method: node?.apiConfig?.method || "GET",
         });
@@ -890,34 +1039,48 @@ const executeControlledApiNode = async (node: any): Promise<string> => {
 const sendControlledNodeToTelegram = async (
     botToken: string,
     chatId: string | number,
-    nodeContainer: TelegramControlledNodeContainer
+    nodeContainer: TelegramControlledNodeContainer,
+    sessionVariables: Record<string, string> = {}
 ): Promise<boolean> => {
     const node = nodeContainer.currentNode;
     const baseMessage = getControlledTelegramNodeMessage(node) || "Please continue.";
 
     if (node?.executor === "none" && node?.output?.mode === "options") {
-        const optionsText = formatOptionListForTelegram(nodeContainer.options);
-        const text = `${baseMessage}\n\n${optionsText}\n\nReply with option number/text, or use /back or /end.`;
-        return sendTelegramTextMessage(botToken, chatId, text);
+        const sortedOptions = [...(nodeContainer.options || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        const optionRows = sortedOptions
+            .filter((option) => option?.intent && option?.toNodeId)
+            .map((option) => [{ text: option.intent, callback_data: option.optionId || option.intent }]);
+
+        const inlineKeyboard = [...optionRows, [{ text: "Back", callback_data: "/back" }, { text: "End", callback_data: "/end" }]];
+
+        if (inlineKeyboard.length === 0) {
+            return sendControlledTextMessage(botToken, chatId, `${baseMessage}\n\nNo options available for this node. Use /back or /end.`);
+        }
+
+        const text = `${baseMessage}\n\nTap a button below. You can also use /back or /end.`;
+        return sendTelegramMessage(botToken, chatId, text, {
+            inline_keyboard: inlineKeyboard,
+        });
     }
 
     if (node?.executor === "input") {
         const inputLabel = node?.inputConfig?.key ? ` (${node.inputConfig.key})` : "";
         const text = `${baseMessage}\n\nPlease provide input${inputLabel}. Use /back or /end anytime.`;
-        return sendTelegramTextMessage(botToken, chatId, text);
+        return sendControlledTextMessage(botToken, chatId, text);
     }
 
     if (node?.executor === "api") {
-        const apiResultText = await executeControlledApiNode(node);
-        return sendTelegramTextMessage(botToken, chatId, `${baseMessage}\n\n${apiResultText}`);
+        const apiResultText = await executeControlledApiNode(node, sessionVariables);
+        return sendControlledTextMessage(botToken, chatId, `${baseMessage}\n\n${apiResultText}`);
     }
 
-    return sendTelegramTextMessage(botToken, chatId, `${baseMessage}\n\nUse /back or /end.`);
+    return sendControlledTextMessage(botToken, chatId, `${baseMessage}\n\nUse /back or /end.`);
 };
 
 export const CommunicateWithTelegramControlledStyleBotController = async (req: Request, res: Response): Promise<void> => {
     let chatId: string | number | undefined;
     let botToken = "";
+    let callbackQueryId: string | undefined;
 
     try {
         const { botId } = req.params;
@@ -925,6 +1088,7 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
         const parsed = parseTelegramControlledInput(update);
         chatId = parsed.chatId;
         const userInput = parsed.userInput;
+        callbackQueryId = parsed.callbackQueryId;
 
         if (!botId || !chatId || !userInput) {
             res.sendStatus(200);
@@ -956,6 +1120,8 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
         const botStatus = botDetails.status;
         const entryNodeId = botDetails.entryNodeId;
 
+        await answerTelegramCallbackQuery(botToken, callbackQueryId);
+
         if (!botToken) {
             console.error("[Telegram][Controlled] botToken missing", { botId });
             res.sendStatus(200);
@@ -963,13 +1129,13 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
         }
 
         if (botStatus !== "active") {
-            await sendTelegramTextMessage(botToken, chatId, "This controlled bot is inactive.");
+            await sendControlledTextMessage(botToken, chatId, "This controlled bot is inactive.");
             res.sendStatus(200);
             return;
         }
 
         if (!entryNodeId) {
-            await sendTelegramTextMessage(botToken, chatId, "Entry node is not configured for this controlled bot.");
+            await sendControlledTextMessage(botToken, chatId, "Entry node is not configured for this controlled bot.");
             res.sendStatus(200);
             return;
         }
@@ -977,7 +1143,7 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
         const normalizedInput = normalizeControlledInput(userInput);
         if (normalizedInput === "/end") {
             await redis.del(sessionRedisKey);
-            await sendTelegramTextMessage(botToken, chatId, "Chat ended. Send /start to start again.");
+            await sendControlledTextMessage(botToken, chatId, "Chat ended. Send /start to start again.");
             res.sendStatus(200);
             return;
         }
@@ -987,7 +1153,7 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
         if (!session || normalizedInput === "/start") {
             const firstNode = await getControlledNodeFromCacheOrDb(botId, String(entryNodeId), nodeRedisKey);
             if (!firstNode) {
-                await sendTelegramTextMessage(botToken, chatId, "Unable to start controlled flow. Entry node missing.");
+                await sendControlledTextMessage(botToken, chatId, "Unable to start controlled flow. Entry node missing.");
                 res.sendStatus(200);
                 return;
             }
@@ -996,23 +1162,24 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
                 currentNodeId: String(entryNodeId),
                 previousNodeId: null,
                 retryCount: 0,
+                variables: {},
             }), { ex: 60 * 60 });
 
-            const sent = await sendControlledNodeToTelegram(botToken, chatId, firstNode);
+            const sent = await sendControlledNodeToTelegram(botToken, chatId, firstNode, {});
             res.sendStatus(sent ? 200 : 500);
             return;
         }
 
         if (normalizedInput === "/back") {
             if (!session.previousNodeId) {
-                await sendTelegramTextMessage(botToken, chatId, "You are already at the start node.");
+                await sendControlledTextMessage(botToken, chatId, "You are already at the start node.");
                 res.sendStatus(200);
                 return;
             }
 
             const previousNode = await getControlledNodeFromCacheOrDb(botId, session.previousNodeId, nodeRedisKey);
             if (!previousNode) {
-                await sendTelegramTextMessage(botToken, chatId, "Unable to go back right now.");
+                await sendControlledTextMessage(botToken, chatId, "Unable to go back right now.");
                 res.sendStatus(200);
                 return;
             }
@@ -1021,9 +1188,10 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
                 currentNodeId: session.previousNodeId,
                 previousNodeId: null,
                 retryCount: 0,
+                variables: session.variables || {},
             }), { ex: 60 * 60 });
 
-            const sent = await sendControlledNodeToTelegram(botToken, chatId, previousNode);
+            const sent = await sendControlledNodeToTelegram(botToken, chatId, previousNode, session.variables || {});
             res.sendStatus(sent ? 200 : 500);
             return;
         }
@@ -1031,7 +1199,7 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
         const currentNodeContainer = await getControlledNodeFromCacheOrDb(botId, session.currentNodeId, nodeRedisKey);
         if (!currentNodeContainer) {
             await redis.del(sessionRedisKey);
-            await sendTelegramTextMessage(botToken, chatId, "Session expired. Send /start to begin again.");
+            await sendControlledTextMessage(botToken, chatId, "Session expired. Send /start to begin again.");
             res.sendStatus(200);
             return;
         }
@@ -1042,14 +1210,14 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
             const chosenOption = resolveSelectedOption(userInput, currentNodeContainer.options);
             if (!chosenOption?.toNodeId) {
                 const optionsText = formatOptionListForTelegram(currentNodeContainer.options);
-                await sendTelegramTextMessage(botToken, chatId, `Invalid option.\n\n${optionsText}`);
+                await sendControlledTextMessage(botToken, chatId, `Invalid option.\n\n${optionsText}`);
                 res.sendStatus(200);
                 return;
             }
 
             const nextNode = await getControlledNodeFromCacheOrDb(botId, chosenOption.toNodeId, nodeRedisKey);
             if (!nextNode) {
-                await sendTelegramTextMessage(botToken, chatId, "Next node is missing in configured flow.");
+                await sendControlledTextMessage(botToken, chatId, "Next node is missing in configured flow.");
                 res.sendStatus(200);
                 return;
             }
@@ -1058,9 +1226,10 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
                 currentNodeId: chosenOption.toNodeId,
                 previousNodeId: session.currentNodeId,
                 retryCount: 0,
+                variables: session.variables || {},
             }), { ex: 60 * 60 });
 
-            const sent = await sendControlledNodeToTelegram(botToken, chatId, nextNode);
+            const sent = await sendControlledNodeToTelegram(botToken, chatId, nextNode, session.variables || {});
             res.sendStatus(sent ? 200 : 500);
             return;
         }
@@ -1078,12 +1247,13 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
                         currentNodeId: session.currentNodeId,
                         previousNodeId: session.previousNodeId,
                         retryCount: newRetryCount,
+                        variables: session.variables || {},
                     }), { ex: 60 * 60 });
 
                     if (retryLimit > 0 && newRetryCount >= retryLimit) {
-                        await sendTelegramTextMessage(botToken, chatId, "Input failed validation too many times. Use /back or /end.");
+                        await sendControlledTextMessage(botToken, chatId, "Input failed validation too many times. Use /back or /end.");
                     } else {
-                        await sendTelegramTextMessage(botToken, chatId, "Invalid input format. Please try again.");
+                        await sendControlledTextMessage(botToken, chatId, "Invalid input format. Please try again.");
                     }
 
                     res.sendStatus(200);
@@ -1093,14 +1263,22 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
 
             const nextNodeId = currentNode?.inputConfig?.nextNodeId?.toString?.() || currentNode?.inputConfig?.nextNodeId;
             if (!nextNodeId) {
-                await sendTelegramTextMessage(botToken, chatId, "Input node next step is not configured.");
+                await sendControlledTextMessage(botToken, chatId, "Input node next step is not configured.");
                 res.sendStatus(200);
                 return;
             }
 
+            const inputKey = String(currentNode?.inputConfig?.key || "").trim();
+            const nextVariables = { ...(session.variables || {}) };
+            if (inputKey) {
+                nextVariables[inputKey] = String(userInput).trim();
+            }
+            nextVariables.__lastInputKey = inputKey || "lastInput";
+            nextVariables.__lastInputValue = String(userInput).trim();
+
             const nextNode = await getControlledNodeFromCacheOrDb(botId, String(nextNodeId), nodeRedisKey);
             if (!nextNode) {
-                await sendTelegramTextMessage(botToken, chatId, "Unable to continue to next node.");
+                await sendControlledTextMessage(botToken, chatId, "Unable to continue to next node.");
                 res.sendStatus(200);
                 return;
             }
@@ -1109,39 +1287,67 @@ export const CommunicateWithTelegramControlledStyleBotController = async (req: R
                 currentNodeId: String(nextNodeId),
                 previousNodeId: session.currentNodeId,
                 retryCount: 0,
+                variables: nextVariables,
             }), { ex: 60 * 60 });
 
-            const sent = await sendControlledNodeToTelegram(botToken, chatId, nextNode);
+            const sent = await sendControlledNodeToTelegram(botToken, chatId, nextNode, nextVariables);
+
+            // If input routes into an API node, execute it immediately and auto-advance if API next node exists.
+            if (sent && nextNode.currentNode?.executor === "api") {
+                const apiNextNodeId =
+                    nextNode.currentNode?.apiConfig?.nextNodeId?.toString?.() ||
+                    nextNode.currentNode?.apiConfig?.nextNodeId;
+
+                if (apiNextNodeId) {
+                    const apiNextNode = await getControlledNodeFromCacheOrDb(botId, String(apiNextNodeId), nodeRedisKey);
+                    if (apiNextNode) {
+                        await redis.set(sessionRedisKey, JSON.stringify({
+                            currentNodeId: String(apiNextNodeId),
+                            previousNodeId: String(nextNodeId),
+                            retryCount: 0,
+                            variables: nextVariables,
+                        }), { ex: 60 * 60 });
+
+                        await sendControlledNodeToTelegram(botToken, chatId, apiNextNode, nextVariables);
+                    }
+                }
+            }
+
             res.sendStatus(sent ? 200 : 500);
             return;
         }
 
         if (currentNode?.executor === "api") {
+            const apiNextNodeId = currentNode?.apiConfig?.nextNodeId?.toString?.() || currentNode?.apiConfig?.nextNodeId;
+            if (!apiNextNodeId) {
+                await sendControlledTextMessage(botToken, chatId, "This step is already processed. Use /back or /end to continue.");
+                res.sendStatus(200);
+                return;
+            }
+
             const sentCurrent = await sendControlledNodeToTelegram(botToken, chatId, currentNodeContainer);
             if (!sentCurrent) {
                 res.sendStatus(500);
                 return;
             }
 
-            const nextNodeId = currentNode?.apiConfig?.nextNodeId?.toString?.() || currentNode?.apiConfig?.nextNodeId;
-            if (nextNodeId) {
-                const nextNode = await getControlledNodeFromCacheOrDb(botId, String(nextNodeId), nodeRedisKey);
-                if (nextNode) {
-                    await redis.set(sessionRedisKey, JSON.stringify({
-                        currentNodeId: String(nextNodeId),
-                        previousNodeId: session.currentNodeId,
-                        retryCount: 0,
-                    }), { ex: 60 * 60 });
+            const nextNode = await getControlledNodeFromCacheOrDb(botId, String(apiNextNodeId), nodeRedisKey);
+            if (nextNode) {
+                await redis.set(sessionRedisKey, JSON.stringify({
+                    currentNodeId: String(apiNextNodeId),
+                    previousNodeId: session.currentNodeId,
+                    retryCount: 0,
+                    variables: session.variables || {},
+                }), { ex: 60 * 60 });
 
-                    await sendControlledNodeToTelegram(botToken, chatId, nextNode);
-                }
+                await sendControlledNodeToTelegram(botToken, chatId, nextNode, session.variables || {});
             }
 
             res.sendStatus(200);
             return;
         }
 
-        const sent = await sendControlledNodeToTelegram(botToken, chatId, currentNodeContainer);
+        const sent = await sendControlledNodeToTelegram(botToken, chatId, currentNodeContainer, session.variables || {});
         res.sendStatus(sent ? 200 : 500);
     } catch (error) {
         console.error("Error in CommunicateWithTelegramControlledStyleBotController:", error);
