@@ -52,7 +52,7 @@ const bootstrapWorker = async (): Promise<void> => {
                     await markFailed(`Scraping produced text but chunking failed for the URL: ${url}.`);
                     return;
                 }
-
+ 
                 // 5) generating embedding
                 const embeddings = await generateEmbeddings(chunks);
 
