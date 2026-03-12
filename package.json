@@ -31,6 +31,7 @@
     "bullmq": "^5.69.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "discord.js": "^14.25.1",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "ioredis": "^5.9.3",

@@ -10,7 +10,7 @@ type FreeStyleBotPromptParams = {
   tone: string;
   verbosity: string;
   websiteType: string;
-  channel?: "website" | "telegram";
+  channel?: "website" | "telegram" | "discord";
 
   description: string;
 
@@ -76,12 +76,17 @@ export const freeStyleWebsiteBotPrompt = ({
   apiResponseFormat,
   apiUsageRule
 }: FreeStyleBotPromptParams): string => {
+  const isDiscord = channel === "discord";
   const isTelegram = channel === "telegram";
-  const platformText = isTelegram ? "Telegram chat" : `${websiteType} website`;
-  const scopeText = isTelegram
+  const platformText = isDiscord ? "Discord server" : isTelegram ? "Telegram chat" : `${websiteType} website`;
+  const scopeText = isDiscord
+    ? "Only answer questions related to this Discord bot and its configured business context. Politely refuse unrelated requests."
+    : isTelegram
     ? "Only answer questions related to this Telegram bot and its configured business context. Politely refuse unrelated requests."
     : "Only answer questions related to the website. Politely refuse unrelated requests.";
-  const formatRules = isTelegram
+  const formatRules = isDiscord
+    ? "FORMAT: Discord-compatible plain text. Keep responses clean, readable, and concise. Avoid complex formatting. You may use basic Discord markdown (bold, italic) sparingly."
+    : isTelegram
     ? "FORMAT: Telegram-safe plain text only. Do NOT use Markdown, MarkdownV2, HTML tags, code fences, tables, or special formatting syntax. Keep output clean, readable, and concise for chat."
     : "FORMAT: Website chat plain text. Keep responses clean and easy to read. Avoid special formatting that depends on client-side rendering.";
 

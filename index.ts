@@ -16,6 +16,8 @@ import communcationWithBotRouter from './Router/CommunicationWithBot/Website/rou
 import { botAnalyticsRouter } from './Router/BotAnalytics/router.js';
 import { deleteScheduler } from './Schedulers/DeleteBotScheduler.js';
 import TelegramBotRouter from './Router/Telegram/router.js';
+import DiscordRouter from './Router/Discord/router.js';
+import { startDiscordClient } from './integrations/Discord/discordClient.js';
 dotenv.config();
 
 const app = express();
@@ -53,6 +55,7 @@ app.use("/api/advanceBotController", advanceBotRouter);
 app.use("/api/APIKeyManagement", APIKeyRouter);
 app.use("/api/botAnalytics", botAnalyticsRouter)
 app.use("/api/Telegram", TelegramBotRouter);
+app.use("/api/Discord", DiscordRouter);
 
 //communcation with website bot : 
 app.use("/v1/websiteBot/", communcationWithBotRouter);
@@ -64,4 +67,9 @@ app.get("/ping", (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+
+    // Start Discord bot client (non-blocking)
+    startDiscordClient().catch((err) => {
+        console.error("[Discord] Failed to start Discord client during startup:", err);
+    });
 });
