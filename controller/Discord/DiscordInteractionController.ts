@@ -109,7 +109,7 @@ const retrieveRAGContext = async (botId: string, userQuery: string, topK: number
     }
 };
 
-// ─── URL Resolution helpers (mirrors Telegram) ───
+// ─── URL Resolution helpers  ───
 
 const isHttpUrl = (value: string): boolean => {
     try {
@@ -260,7 +260,7 @@ const processAskCommand = async (interaction: ChatInputCommandInteraction): Prom
             return;
         }
 
-        // ─── Step 3: Build system prompt (reusing existing freestyle logic) ───
+        // ─── Step 3: Build system prompt ───
         let examples: unknown = config.examples;
         if (typeof examples === "string") {
             try {
