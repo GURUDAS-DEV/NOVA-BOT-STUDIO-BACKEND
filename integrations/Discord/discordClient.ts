@@ -5,6 +5,7 @@ import { handleDiscordInteraction } from "../../controller/Discord/DiscordIntera
 dotenv.config();
 
 let discordClient: Client | null = null;
+let discordClientId: string | null = null;
 
 /**
  * Initialize and start the Discord bot client.
@@ -31,6 +32,8 @@ export const startDiscordClient = async (): Promise<void> => {
         // ─── Ready Event ───
         discordClient.once(Events.ClientReady, (readyClient) => {
             console.log(`[Discord] Bot connected: ${readyClient.user.tag}`);
+            discordClientId = readyClient.user.id;
+            console.log(`[Discord] Bot CLIENT_ID: ${discordClientId}`);
         });
 
         // ─── Guild Join Event ───
@@ -77,4 +80,11 @@ export const startDiscordClient = async (): Promise<void> => {
  */
 export const getDiscordClient = (): Client | null => {
     return discordClient;
+};
+
+/**
+ * Returns the Discord bot's CLIENT_ID (application ID), or null if not initialized.
+ */
+export const getDiscordClientId = (): string | null => {
+    return discordClientId;
 };

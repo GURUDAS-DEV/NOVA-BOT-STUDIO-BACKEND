@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { connectDiscordGuildController } from "../../controller/Discord/controller.js";
+import { authMiddleware } from "../../Middleware/authMiddleware.js";
 
 /**
  * Discord Router
@@ -13,7 +15,6 @@ import { Router } from "express";
  */
 const DiscordRouter = Router();
 
-// Placeholder: future Discord-specific HTTP routes go here
-// Example: DiscordRouter.post("/interactions", discordInteractionWebhookHandler);
+DiscordRouter.post("/connectGuild", authMiddleware, connectDiscordGuildController);
 
 export default DiscordRouter;

@@ -7,6 +7,7 @@ import { supabase } from "../../Database/postgresql.js";
 import { hash } from "bcrypt-ts";
 import { hashApiKey } from "../../utils/helper/APIKeyHashing.js";
 import { ControlledBotModel } from "../../Models/ControlledBotSchema.js";
+import { getDiscordClientId } from "../../integrations/Discord/discordClient.js";
 
 
 export const startBotController = async(req : Request, res : Response) : Promise<Response> => {
@@ -33,6 +34,29 @@ export const startBotController = async(req : Request, res : Response) : Promise
             await botDetails.save();
             
             return res.status(200).json({ message : "Telegram Bot started successfully." });
+        }
+
+        // ─── Discord Bot ───
+        if(botDetails.platform === "Discord"){
+            botDetails.status = transistionBotLifecycle(botDetails.status, 'active');
+            await botDetails.save();
+            
+            const clientId = getDiscordClientId();
+            if(!clientId){
+                return res.status(500).json({ 
+                    message : "Discord bot not ready. Please try again in a moment.", 
+                    error: "CLIENT_ID not available yet"
+                });
+            }
+
+            const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&scope=bot%20applications.commands&permissions=274877975552`;
+            
+            return res.status(200).json({ 
+                message : "Discord Bot started successfully.", 
+                clientId,
+                botId: String(botDetails._id),
+                inviteUrl,
+            });
         }
 
         const botConfig = await botConfiguration.find({botId : botId});

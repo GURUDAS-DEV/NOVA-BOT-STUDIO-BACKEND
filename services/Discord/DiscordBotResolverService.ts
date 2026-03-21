@@ -1,6 +1,7 @@
 import { BotStructureModel } from "../../Models/BotStructure.js";
 import { botConfiguration } from "../../Models/BotConfiguration.js";
 import { getRedisClient } from "../../Redis/connect.js";
+import { DiscordGuildBindingModel } from "../../Models/DiscordGuildBinding.js";
 
 const redis = getRedisClient();
 
@@ -17,7 +18,8 @@ export interface ResolvedDiscordBot {
  *
  * Resolution strategy:
  *   1. Check Redis cache first (`DiscordGuildBot:{guildId}`)
- *   2. Query MongoDB for a Freestyle bot on the Discord platform
+ *   2. Resolve guild -> bot mapping from persistent DiscordGuildBinding
+ *   3. Load the mapped Freestyle bot + configuration
  *   3. Cache the result for 30 minutes
  *
  * Returns null if no matching bot is found.
@@ -30,15 +32,28 @@ export const resolveBotFromGuild = async (guildId: string): Promise<ResolvedDisc
 
         if (cached) {
             const parsed = typeof cached === "string" ? JSON.parse(cached) : cached;
+            if (!parsed?.source || parsed.source !== "guild-binding") {
+                await redis.del(redisKey);
+            } else {
             console.log(`[Discord] Bot resolved from cache for guild ${guildId}: ${parsed.botId}`);
             return parsed as ResolvedDiscordBot;
+            }
         }
 
-        // ─── 2. Query database for a Discord freestyle bot ───
-        // Find an active freestyle bot configured for Discord platform
+        // ─── 2. Resolve guild mapping ───
+        const guildBinding = await DiscordGuildBindingModel.findOne({ guildId });
+
+        if (!guildBinding) {
+            console.warn(`[Discord] No bot mapping found for guild ${guildId}`);
+            return null;
+        }
+
+        // ─── 3. Load mapped bot ───
         const botRecord = await BotStructureModel.findOne({
+            _id: guildBinding.botId,
             platform: "Discord",
-            style: "free-style",
+            style: "FREESTYLE",
+            status: { $ne: "deleted" },
         });
 
         if (!botRecord) {
@@ -46,7 +61,7 @@ export const resolveBotFromGuild = async (guildId: string): Promise<ResolvedDisc
             return null;
         }
 
-        const botId = botRecord._id.toString();
+        const botId = String(botRecord._id);
 
         // Fetch bot configuration
         const configRecord = await botConfiguration.findOne({ botId });
@@ -64,8 +79,8 @@ export const resolveBotFromGuild = async (guildId: string): Promise<ResolvedDisc
             config: configRecord.config || {},
         };
 
-        // ─── 3. Cache result ───
-        await redis.set(redisKey, JSON.stringify(resolved), { ex: 1800 });
+        // ─── 4. Cache result ───
+        await redis.set(redisKey, JSON.stringify({ ...resolved, source: "guild-binding" }), { ex: 1800 });
         console.log(`[Discord] Bot resolved from DB for guild ${guildId}: ${botId}`);
 
         return resolved;
