@@ -13,12 +13,15 @@ import { getLoginOTPEmailHtml } from "../../Email/htmlTemplateForOTPSendingLogin
 
 
 
+const isProduction = process.env.NODE_ENV === "production";
+const BACKEND_URL = (process.env.BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+
 const cookieOptions = {
     httpOnly: true,
-    secure: false, // Must be false for localhost HTTP
-    sameSite: "lax" as const, // 'lax' works for same-site localhost requests
+    secure: isProduction,
+    sameSite: isProduction ? ("none" as const) : ("lax" as const),
     path: "/"
-    // Do NOT set domain for localhost
 };
 
 export const handleOTPGeneration = async (req: Request, res: Response): Promise<Response> => {
@@ -564,7 +567,7 @@ export const handleGoogleAuthInitialReq = async (req: Request, res: Response): P
         const googleOAuthURL = "https://accounts.google.com/o/oauth2/v2/auth";
         const params = new URLSearchParams({
             client_id: process.env.GOOGLE_CLIENT_ID || "",
-            redirect_uri: "http://localhost:9000/api/auth/google/callback",
+            redirect_uri: `${BACKEND_URL}/api/auth/google/callback`,
             response_type: "code",
             scope: "openid email profile",
             access_type: "offline",
@@ -596,7 +599,7 @@ export const handleGoogleAuthentication = async (req: Request, res: Response): P
                 code: code.toString(),
                 client_id: process.env.GOOGLE_CLIENT_ID!,
                 client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-                redirect_uri: "http://localhost:9000/api/auth/google/callback",
+                redirect_uri: `${BACKEND_URL}/api/auth/google/callback`,
                 grant_type: "authorization_code",
             }),
         });
@@ -672,7 +675,7 @@ export const handleGoogleAuthentication = async (req: Request, res: Response): P
                 maxAge: 40 * 24 * 60 * 60 * 1000, // 40 days
             });
 
-            res.redirect("http://localhost:3000/home");
+            res.redirect(`${FRONTEND_URL}/home`);
             return res.status(200).json({ message: "User registered and logged in successfully via Google!", isLoggedIn: true, username: newUser.username, email: newUser.email });
         }
 
@@ -711,7 +714,7 @@ export const handleGoogleAuthentication = async (req: Request, res: Response): P
         });
 
 
-        res.redirect("http://localhost:3000/home");
+        res.redirect(`${FRONTEND_URL}/home`);
         return res.status(200).json({ message: "User logged in successfully via Google!", isLoggedIn: true, username: user.username, email: user.email });
     }
     catch (e: any) {
@@ -727,7 +730,7 @@ export const handleGitHubAuthInitialReq = async (req: Request, res: Response): P
         const githubOAuthURL = "https://github.com/login/oauth/authorize";
         const params = new URLSearchParams({
             client_id: process.env.GITHUB_CLIENT_ID || "",
-            redirect_uri: "http://localhost:9000/api/auth/github/callback",
+            redirect_uri: `${BACKEND_URL}/api/auth/github/callback`,
             response_type: "code",
             access_type: "offline",
             prompt: "consent",
@@ -760,7 +763,7 @@ export const handleGitHubAuthentication = async (req: Request, res: Response): P
                 code: code.toString(),
                 client_id: process.env.GITHUB_CLIENT_ID!,
                 client_secret: process.env.GITHUB_CLIENT_SECRET!,
-                redirect_uri: "http://localhost:9000/api/auth/github/callback",
+                redirect_uri: `${BACKEND_URL}/api/auth/github/callback`,
             }),
         });
 
@@ -852,7 +855,7 @@ export const handleGitHubAuthentication = async (req: Request, res: Response): P
                 maxAge: 40 * 24 * 60 * 60 * 1000, // 40 days
             });
 
-            res.redirect("http://localhost:3000/home");
+            res.redirect(`${FRONTEND_URL}/home`);
             return res.status(200).json({ message: "User registered and logged in successfully via GITHUB!", isLoggedIn: true, username: newUser.username, email: newUser.email });
         }
 
@@ -891,7 +894,7 @@ export const handleGitHubAuthentication = async (req: Request, res: Response): P
         });
 
 
-        res.redirect("http://localhost:3000/home");
+        res.redirect(`${FRONTEND_URL}/home`);
         return res.status(200).json({ message: "User logged in successfully via GITHUB!", isLoggedIn: true, username: user.username, email: user.email });
     }
     catch (e: any) {

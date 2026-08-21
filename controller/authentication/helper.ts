@@ -75,11 +75,13 @@ export const helperForRefreshTokenOnly = async (refreshToken: string, sessionId:
   //generate new access token
   const newAccessToken = generateAccessToken(refreshPayload.userId, refreshPayload.username, refreshPayload.email).accessToken;
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   //set new access token in cookie
   res.cookie("accessToken", newAccessToken, {
     httpOnly: true,
-    secure: false, // Must be false for localhost HTTP
-    sameSite: "lax" as const, // 'lax' works for same-site localhost requests
+    secure: isProduction,
+    sameSite: isProduction ? ("none" as const) : ("lax" as const),
     path: "/",
     maxAge: 15 * 60 * 1000
   });

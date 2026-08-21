@@ -23,17 +23,29 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 9000;
 
-const allowedOrigins = ['http://localhost:3000', 'http://localhost:5173',];
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://novabotstudiox.tech',
+    'https://www.novabotstudiox.tech',
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
+];
 
 // CORS must be first - before any other middleware
-app.use("/api",cors({
-    origin: allowedOrigins,
+app.use("/api", cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+            callback(null, true);
+        } else {
+            callback(new Error(`CORS blocked for origin: ${origin}`));
+        }
+    },
     credentials: true,
 }));
 
 app.use("/v1", cors({
     origin: "*",
-    credentials : false,
+    credentials: false,
 }))
 
 // Then cookie parser and body parsers
