@@ -4,8 +4,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "nodemon --exec tsx index.ts",
-    "worker": "nodemon --exec tsx utils/BackgroundWorker/ScraperWorker.ts"
+    "start": "tsx index.ts",
+    "worker": "tsx utils/BackgroundWorker/ScraperWorker.ts",
+    "dev": "nodemon --exec tsx index.ts",
+    "dev:worker": "nodemon --exec tsx utils/BackgroundWorker/ScraperWorker.ts"
   },
   "author": "",
   "license": "ISC",
@@ -18,10 +20,10 @@
     "@types/node": "^24.10.1",
     "@types/node-cron": "^3.0.11",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "tsx": "^4.21.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.86.2",
     "@types/crypto-js": "^4.2.2",
