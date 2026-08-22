@@ -26,29 +26,49 @@ const PORT = process.env.PORT || 9000;
 const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:5173',
+    'https://nova.gurudes.tech',
+    'https://www.nova.gurudes.tech',
+    'https://novabot.gurudes.tech',
+    'https://www.novabot.gurudes.tech',
+    'https://nova-api.gurudes.tech',
     'https://novabotstudiox.tech',
     'https://www.novabotstudiox.tech',
-    'https://www.novabot.gurudes.tech',
-    'https://novabot.gurudes.tech',
-    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL.replace(/\/$/, "")] : [])
 ];
 
-// CORS must be first - before any other middleware
-app.use("/api", cors({
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+    if (!origin) return true;
+    const cleanOrigin = origin.replace(/\/$/, "");
+    if (
+        allowedOrigins.includes(cleanOrigin) ||
+        cleanOrigin.endsWith(".gurudes.tech") ||
+        cleanOrigin.endsWith(".novabotstudiox.tech") ||
+        cleanOrigin.includes("localhost")
+    ) {
+        return true;
+    }
+    return false;
+};
+
+// Global CORS Middleware
+app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+        if (isAllowedOrigin(origin)) {
             callback(null, true);
         } else {
-            callback(new Error(`CORS blocked for origin: ${origin}`));
+            callback(null, false);
         }
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Set-Cookie'],
 }));
 
 app.use("/v1", cors({
     origin: "*",
     credentials: false,
-}))
+}));
 
 // Then cookie parser and body parsers
 app.use(cookieParser());
