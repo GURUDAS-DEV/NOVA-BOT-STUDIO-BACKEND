@@ -28,6 +28,7 @@ const allowedOrigins = [
     'http://localhost:5173',
     'https://novabotstudiox.tech',
     'https://www.novabotstudiox.tech',
+    'https://www.novabot.gurudes.tech',
     ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
 ];
 
