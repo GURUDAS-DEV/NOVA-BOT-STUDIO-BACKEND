@@ -17,11 +17,18 @@ const isProduction = process.env.NODE_ENV === "production";
 const BACKEND_URL = (process.env.BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
 
+const getCookieDomain = () => {
+    if (!isProduction) return undefined;
+    if (process.env.COOKIE_DOMAIN) return process.env.COOKIE_DOMAIN;
+    return ".gurudes.tech";
+};
+
 const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? ("none" as const) : ("lax" as const),
-    path: "/"
+    path: "/",
+    domain: getCookieDomain(),
 };
 
 export const handleOTPGeneration = async (req: Request, res: Response): Promise<Response> => {

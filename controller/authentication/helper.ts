@@ -76,6 +76,7 @@ export const helperForRefreshTokenOnly = async (refreshToken: string, sessionId:
   const newAccessToken = generateAccessToken(refreshPayload.userId, refreshPayload.username, refreshPayload.email).accessToken;
 
   const isProduction = process.env.NODE_ENV === "production";
+  const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? ".gurudes.tech" : undefined);
 
   //set new access token in cookie
   res.cookie("accessToken", newAccessToken, {
@@ -83,6 +84,7 @@ export const helperForRefreshTokenOnly = async (refreshToken: string, sessionId:
     secure: isProduction,
     sameSite: isProduction ? ("none" as const) : ("lax" as const),
     path: "/",
+    domain: cookieDomain,
     maxAge: 15 * 60 * 1000
   });
 

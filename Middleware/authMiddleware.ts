@@ -44,34 +44,38 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
             }
         }
 
+        const isProduction = process.env.NODE_ENV === "production";
+        const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? ".gurudes.tech" : undefined);
+        const clearOptions = { path: "/", ...(cookieDomain ? { domain: cookieDomain } : {}) };
+
         const { data, error } = await supabase.from("session").select("userId, refreshToken, expiredAt, revoked").eq("sessionId", sessionId).single();
 
         if (error || !data) {
-            res.clearCookie("accessToken", { path: "/" });
-            res.clearCookie("refreshToken", { path: "/" });
-            res.clearCookie("sessionId", { path: "/" });
+            res.clearCookie("accessToken", clearOptions);
+            res.clearCookie("refreshToken", clearOptions);
+            res.clearCookie("sessionId", clearOptions);
             return res.status(401).json({ message: "Unauthorized: Invalid session! Refresh Token not in DB" });
         }
         
         if (data.revoked) {
-            res.clearCookie("accessToken", { path: "/" });
-            res.clearCookie("refreshToken", { path: "/" });
-            res.clearCookie("sessionId", { path: "/" });
+            res.clearCookie("accessToken", clearOptions);
+            res.clearCookie("refreshToken", clearOptions);
+            res.clearCookie("sessionId", clearOptions);
             return res.status(401).json({ message: "Unauthorized: Session has been revoked" });
         }
         
         if (new Date(data.expiredAt) < new Date()) {
-            res.clearCookie("accessToken", { path: "/" });
-            res.clearCookie("refreshToken", { path: "/" });
-            res.clearCookie("sessionId", { path: "/" });
+            res.clearCookie("accessToken", clearOptions);
+            res.clearCookie("refreshToken", clearOptions);
+            res.clearCookie("sessionId", clearOptions);
             return res.status(401).json({ message: "Unauthorized: Session has expired! refreshToken expired" });
         }
         
         const isRefreshTokenValid = await compare(refreshToken, data.refreshToken);
         if (!isRefreshTokenValid) {
-            res.clearCookie("accessToken", { path: "/" });
-            res.clearCookie("refreshToken", { path: "/" });
-            res.clearCookie("sessionId", { path: "/" });
+            res.clearCookie("accessToken", clearOptions);
+            res.clearCookie("refreshToken", clearOptions);
+            res.clearCookie("sessionId", clearOptions);
             return res.status(401).json({ message: "Unauthorized: Invalid refresh token! Refresh Token not match" });
         }
 
@@ -79,7 +83,14 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
         const { userId, username, email } = decodedRefresh;
 
         const { accessToken: newAccessToken } = generateAccessToken(userId, username, email);
-        res.cookie("accessToken", newAccessToken, { httpOnly: true, secure: false, sameSite: "lax" as const, path: "/" });
+        res.cookie("accessToken", newAccessToken, {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? ("none" as const) : ("lax" as const),
+            path: "/",
+            domain: cookieDomain,
+            maxAge: 15 * 60 * 1000
+        });
 
         (req as any).user = {
             userId,
