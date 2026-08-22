@@ -6,7 +6,7 @@ import { generateEmbeddings } from './HelperFunction/generateEmbeddings.js';
 import { connection } from '../BullMQ/BullMq.js';
 import intializeMongoDB from '../../Database/MongoDBDatabase.js';
 import { supabase } from '../../Database/postgresql.js';
-import { Resend } from "resend";
+import { sendEmail } from '../../Email/emailService.js';
 import { buildScrapingDoneEmail } from '../../Email/ScrappingDoneEmail.js';
 import { buildScrapingFailEmail } from '../../Email/ScrappingFailEmail.js';
 
@@ -15,21 +15,33 @@ const bootstrapWorker = async (): Promise<void> => {
 
     const worker = new Worker('scrapeWebsite',
         async (job) => {
-            const { url, botId } = job.data;
-            console.log(`Worker started processing job for URL: ${url}, Bot ID: ${botId}`); 
-            
-            const resend = new Resend(process.env.RESEND_MAIL_API_KEY);
+            const { url, botId, userId, userEmail } = job.data;
+            console.log(`Worker started processing job for URL: ${url}, Bot ID: ${botId}`);
+
+            // Resolve recipient email (from job data or fallback to DB lookup)
+            let recipientEmail = userEmail;
+            if (!recipientEmail && userId) {
+                try {
+                    const { data: userData } = await supabase.from("users").select("email").eq("id", userId).maybeSingle();
+                    if (userData?.email) {
+                        recipientEmail = userData.email;
+                    }
+                } catch (e) {
+                    console.error("Could not fetch user email for notification:", e);
+                }
+            }
 
             const markFailed = async (reason: string): Promise<void> => {
                 await updateScrapingStatus(botId, "failed");
-                await resend.emails.send({
-                    from: "NOVA <onboarding@resend.dev>",
-                    to: "gursad5@gmail.com",
-                    subject: "Nova Bot Studio - Scraping Failed",
-                    html: buildScrapingFailEmail(url, reason),
-                });
+                if (recipientEmail) {
+                    await sendEmail({
+                        to: recipientEmail,
+                        subject: "Nova Bot Studio - Scraping Failed",
+                        html: buildScrapingFailEmail(url, reason),
+                    });
+                }
             };
-            
+
             try {
                 // 1) Update the scraping status to "running" in the database
                 await updateScrapingStatus(botId, "running");
@@ -52,7 +64,7 @@ const bootstrapWorker = async (): Promise<void> => {
                     await markFailed(`Scraping produced text but chunking failed for the URL: ${url}.`);
                     return;
                 }
- 
+
                 // 5) generating embedding
                 const embeddings = await generateEmbeddings(chunks);
 
@@ -72,12 +84,13 @@ const bootstrapWorker = async (): Promise<void> => {
                 await updateScrapingStatus(botId, "completed");
 
                 // 8) Send email notification
-                await resend.emails.send({
-                    from: "NOVA <onboarding@resend.dev>",
-                    to: "gursad5@gmail.com",
-                    subject: "Nova Bot Studio - Scraping Completed",
-                    html: buildScrapingDoneEmail(url),
-                }); 
+                if (recipientEmail) {
+                    await sendEmail({
+                        to: recipientEmail,
+                        subject: "Nova Bot Studio - Scraping Completed",
+                        html: buildScrapingDoneEmail(url),
+                    });
+                }
             }
             catch (e) {
                 const message = e instanceof Error ? e.message : String(e);
@@ -91,28 +104,24 @@ const bootstrapWorker = async (): Promise<void> => {
 
     worker.on('error', async (error) => {
         const message = error instanceof Error ? error.message : String(error);
-        await updateScrapingStatus("unknown", "failed");
-        await new Resend(process.env.RESEND_MAIL_API_KEY).emails.send({
-            from: "NOVA <onboarding@resend.dev>",
-            to: "gursad5@gmail.com",
-            subject: "Nova Bot Studio - Scraper Worker Error",
-            html: buildScrapingFailEmail("unknown", `Worker-level failure: ${message}`),
-        });
+        console.error("Scraper Worker error event:", message);
     });
 
     worker.on('failed', async (job, error) => {
         const url = job?.data?.url ?? "unknown";
         const botId = job?.data?.botId ?? "unknown";
+        const userEmail = job?.data?.userEmail;
         const message = error instanceof Error ? error.message : String(error);
         if (botId !== "unknown") {
             await updateScrapingStatus(botId, "failed");
         }
-        await new Resend(process.env.RESEND_MAIL_API_KEY).emails.send({
-            from: "NOVA <onboarding@resend.dev>",
-            to: "gursad5@gmail.com",
-            subject: "Nova Bot Studio - Scraping Failed",
-            html: buildScrapingFailEmail(url, `Job failed after retries: ${message}`),
-        });
+        if (userEmail) {
+            await sendEmail({
+                to: userEmail,
+                subject: "Nova Bot Studio - Scraping Failed",
+                html: buildScrapingFailEmail(url, `Job failed after retries: ${message}`),
+            });
+        }
     });
 };
 

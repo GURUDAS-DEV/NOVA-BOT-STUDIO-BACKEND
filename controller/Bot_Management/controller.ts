@@ -903,7 +903,9 @@ export const scrapWebsiteForBotController = async(req : Request, res : Response)
       return res.status(400).json({ message : "Scraping is already running or has been completed for this bot!"});
     }
 
-    await scrapeQueue.add('scrapeWebsite', { url, userId, botId }, {
+    const userEmail = (req as any).user?.email;
+
+    await scrapeQueue.add('scrapeWebsite', { url, userId, botId, userEmail }, {
       attempts : 3, 
       backoff : {
         type : 'exponential',

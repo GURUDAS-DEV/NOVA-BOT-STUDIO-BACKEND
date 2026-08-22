@@ -5,7 +5,7 @@ import { generateOTP, helperForRefreshTokenOnly } from "./helper.js";
 import { genSalt, hash, compare } from "bcrypt-ts";
 import { getRegistrationEmailHtml } from "../../Email/htmlTemplateForOTPSending.js";
 import { generateAccessToken } from "../../utils/JWT/GenerateTokens.js";
-import { Resend } from "resend";
+import { sendEmail } from "../../Email/emailService.js";
 import { verifyAccessToken, verifyRefreshToken } from "../../utils/JWT/ValidateToken.js";
 import htmlTemplateForAwaringUser from "../../Email/htmlTemplateForAwaringUser.js";
 import { getLocationFromIP, formatLocation, getBrowserFromUserAgent, getDeviceFromUserAgent } from "../../utils/helper/locationHelper.js";
@@ -70,7 +70,6 @@ export const handleOTPGeneration = async (req: Request, res: Response): Promise<
         const otp_expiry = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
         const saltPromise = genSalt(10);
-        const resend = new Resend(process.env.RESEND_MAIL_API_KEY);
 
         // Wait for salt
         const salt = await saltPromise;
@@ -110,17 +109,13 @@ export const handleOTPGeneration = async (req: Request, res: Response): Promise<
         // while the email is being sent in the background.
         (async () => {
             try {
-                await resend.emails.send({
-                    from: "NOVA <onboarding@resend.dev>",
-                    to: "gursad5@gmail.com",
+                await sendEmail({
+                    to: email,
                     subject: "WELCOME TO NOVA BOT STUDIO - YOUR OTP CODE",
                     html: emailHtml,
                 });
             } catch (err) {
                 console.log("Email sending failed (non-blocking):", err);
-                return res.status(500).json({
-                    message: "Failed to send OTP email. Please try again later.",
-                });
             }
         })();
 
@@ -367,16 +362,11 @@ export const handleLoginControllerByPassword = async (req: Request, res: Respons
                     loginMethod: "Password"
                 });
 
-                const resend = new Resend(process.env.RESEND_MAIL_API_KEY);
-                const { data: emailData, error: emailError } = await resend.emails.send({
-                    from: "NOVA <onboarding@resend.dev>",
-                    to: 'gursad5@gmail.com',
+                await sendEmail({
+                    to: data.email,
                     subject: "Security Alert: New Login to Your Account",
                     html: emailHtml,
                 });
-                if (emailError) {
-                    console.log("Email sending error (non-blocking):", emailError);
-                }
             } catch (err) {
                 console.log("Email sending failed (non-blocking):", err);
             }
@@ -443,23 +433,14 @@ export const handleOTPGenerationForLogin = async (req: Request, res: Response): 
                     location: formatLocation(locationData)
                 });
 
-                const resend = new Resend(process.env.RESEND_MAIL_API_KEY);
-
-                const { data: emailData, error: emailError } = await resend.emails.send({
-                    from: "NOVA <onboarding@resend.dev>",
-                    to: 'gursad5@gmail.com',
+                await sendEmail({
+                    to: email,
                     subject: "Your Login OTP",
                     html: emailHtml,
                 });
-                if (emailError) {
-                    console.log("Email sending error (non-blocking):", emailError);
-                }
             }
             catch (err) {
                 console.log("Email sending failed (non-blocking):", err);
-                return res.status(500).json({
-                    message: "Failed to send OTP email. Please try again later.",
-                });
             }
         })();
 
