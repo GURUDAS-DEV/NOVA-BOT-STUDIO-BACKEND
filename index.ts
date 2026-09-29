@@ -106,4 +106,4 @@ app.listen(PORT, () => {
     startDiscordClient().catch((err) => {
         console.error("[Discord] Failed to start Discord client during startup:", err);
     });
-});
+}); APIKeyRouter
